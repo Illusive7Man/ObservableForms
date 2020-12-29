@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "lib": [ "es5", "es6", "ES2020", "dom", "dom.iterable" ],
+    "noImplicitAny": false,
+    "noEmitOnError": true,
+    "removeComments": true,
+    "sourceMap": true,
+    "declaration": true,
+    "downlevelIteration": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "importHelpers": true,
+
+    "module": "ES6",
+    "moduleResolution": "node",
+    "target": "ES6",
+    "esModuleInterop": false
+  },
+  "compileOnSave": true,
+  "include": [
+    "src/js/*"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules"
+  ]
+}
