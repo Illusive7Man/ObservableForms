@@ -3480,7 +3480,7 @@ var FormControlStatus;
     FormControlStatus["PENDING"] = "PENDING";
     FormControlStatus["DISABLED"] = "DISABLED";
 })(FormControlStatus || (FormControlStatus = {}));
-function enableValidation(jQueryObject, opts) {
+function enableValidation(jQueryObject) {
     if (jQueryObject.valid !== undefined)
         return;
     if (jQueryObject.isFormControl !== true)
@@ -3492,13 +3492,14 @@ function enableValidation(jQueryObject, opts) {
         setValidationRulesFromAttributes(jQueryObject);
     let statusChangesSubject = new Subject();
     jQueryObject.statusChangesSubject = statusChangesSubject;
-    jQueryObject.selectedFormControls$.pipe(switchMap(selectedFormControls => merge(selectedFormControls.length === 0 ? NEVER : selectedFormControls.length === 1 ? jQueryObject.valueChanges : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.statusChanges)).pipe(delay(1)), jQueryObject.manualValidityUpdateSubject.asObservable())), startWith(''), tap(_ => { var _a; return jQueryObject.errors = (_a = jQueryObject.getValidators()) === null || _a === void 0 ? void 0 : _a.map(validatorFn => validatorFn(jQueryObject)).reduce((acc, curr) => curr ? Object.assign(Object.assign({}, acc), curr) : acc, null); }), map(_ => (jQueryObject.selectedFormControls.length > 1 && jQueryObject.errors) || jQueryObject.selectedFormControls.some($formControl => $formControl.errors && !$formControl.attr('disabled') && !$formControl.is('[type=hidden]'))
+    let sub1 = jQueryObject.selectedFormControls$.pipe(switchMap(selectedFormControls => merge(selectedFormControls.length === 0 ? NEVER : selectedFormControls.length === 1 ? jQueryObject.valueChanges : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.statusChanges)).pipe(delay(1)), jQueryObject.manualValidityUpdateSubject.asObservable())), startWith(''), tap(_ => { var _a; return jQueryObject.errors = (_a = jQueryObject.getValidators()) === null || _a === void 0 ? void 0 : _a.map(validatorFn => validatorFn(jQueryObject)).reduce((acc, curr) => curr ? Object.assign(Object.assign({}, acc), curr) : acc, null); }), map(_ => (jQueryObject.selectedFormControls.length > 1 && jQueryObject.errors) || jQueryObject.selectedFormControls.some($formControl => $formControl.errors && !$formControl.attr('disabled') && !$formControl.is('[type=hidden]'))
         ? FormControlStatus.INVALID : FormControlStatus.VALID), tap(status => jQueryObject.valid = status === FormControlStatus.VALID)).subscribe(status => statusChangesSubject.next(status));
     jQueryObject.statusChanges = statusChangesSubject.asObservable().pipe(share());
     jQueryObject.statusChanges.subscribe(status => jQueryObject.status = status);
     attachPopper(jQueryObject);
+    jQueryObject._existingValidationSubscription = sub1;
 }
-function updateValidity(jQueryObject, opts) {
+function updateValidity(jQueryObject) {
     jQueryObject.manualValidityUpdateSubject.next();
 }
 function setValidators(jQueryObject, newValidator) {
@@ -3509,14 +3510,13 @@ function getValidators(jQueryObject) {
     var _a;
     return (_a = jQueryObject._validators) !== null && _a !== void 0 ? _a : null;
 }
-function disableValidation(jQueryObject, opts) {
-    let jQueryAnyObject = jQueryObject;
-    if (jQueryAnyObject._existingValidationSubscription)
-        jQueryAnyObject._existingValidationSubscription.unsubscribe();
-    delete jQueryAnyObject.valid;
-    delete jQueryAnyObject.invalid;
-    delete jQueryAnyObject._existingValidationSubscription;
-    delete jQueryAnyObject._runValidator;
+function disableValidation(jQueryObject) {
+    jQueryObject._existingValidationSubscription.unsubscribe();
+    delete jQueryObject._existingValidationSubscription;
+    jQueryObject.statusChangesSubject.complete();
+    delete jQueryObject.statusChangesSubject;
+    delete jQueryObject.valid;
+    delete jQueryObject.invalid;
 }
 let registeredAttributeValidators = {};
 function registerAttributeValidators(attributeValidators) {
@@ -3575,6 +3575,9 @@ function attachPopper(jQueryObject) {
             popperShownSubject.next(false);
         }
     });
+}
+function hasError(jQueryObject, errorCode) {
+    return Object.keys(jQueryObject.errors).some(key => key === errorCode);
 }
 function setValidationRulesFromAttributes($formControl) {
     let validators = [];
@@ -3750,10 +3753,10 @@ function extendFormElements() {
                 (_a = $d === null || $d === void 0 ? void 0 : $d.dirtySubject) === null || _a === void 0 ? void 0 : _a.next(false);
             });
         },
-        enableValidation(opts) {
+        enableValidation() {
             enableValidation(this);
         },
-        disableValidation(opts) {
+        disableValidation() {
             disableValidation(this);
         },
         setValidators(newValidator) {
@@ -3764,6 +3767,9 @@ function extendFormElements() {
         },
         updateValidity() {
             return updateValidity(this);
+        },
+        hasError(errorCode) {
+            return hasError(this, errorCode);
         },
         reset() {
             this.markAsUntouched();
@@ -3791,18 +3797,27 @@ function extendFormElements() {
         }
     });
     let originalInit = jQuery.fn.init;
-    let formControl = function (args) {
-        return originalInit.apply(this, args);
+    let formControl = function (jQueryObject) {
+        originalInit.call(this, jQueryObject);
+        this.isFormControl = true;
     };
-    formControl.prototype = originalInit.prototype;
+    let formGroup = function (jQueryObject) {
+        originalInit.call(this, jQueryObject);
+        this.isFormControl = true;
+    };
+    formControl.prototype = new originalInit();
+    formGroup.prototype = new originalInit();
     jQuery.fn.init = function () {
         let jQueryObject = new originalInit(arguments[0], arguments[1]);
         if (areFormControlsSelected(jQueryObject) === false)
             return jQueryObject;
-        return convertToFormControl(new formControl(arguments));
+        return convertToFormControl(isGroupSelected(jQueryObject) ? new formGroup(jQueryObject) : new formControl(jQueryObject));
     };
     function areFormControlsSelected(jQueryObject) {
         return jQueryObject.toArray().some(singleJQueryObject => isFormControlType(singleJQueryObject) || singleJQueryObject instanceof HTMLFormElement);
+    }
+    function isGroupSelected(jQueryObject) {
+        return jQueryObject.toArray().filter(singleJQueryObject => isFormControlType(singleJQueryObject)).length > 1 || jQueryObject[0] instanceof HTMLFormElement;
     }
 }
 function convertToFormControl(jQueryObject) {
@@ -3834,7 +3849,6 @@ function convertToFormControl(jQueryObject) {
     jQueryObject.selectedFormControls$.pipe(skip(1)).subscribe(selectedFormControls => selectedFormControls.filter($formControl => !$formControl.isFormControl).forEach($formControl => convertToFormControl($formControl)));
     addFormControlProperties(jQueryObject);
     addToCache(jQueryObject);
-    jQueryObject.isFormControl = true;
     return jQueryObject;
 }
 function addFormControlProperties(jQueryObject) {
