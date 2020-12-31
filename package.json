@@ -2,17 +2,16 @@
   "author": {
     "email": "illusive7man@gmail.com",
     "url": "https://github.com/Illusive7Man",
-    "name": "unknown"
+    "name": "Savo Pejović"
   },
   "bugs": {
-    "url": "add later__"
+    "url": "https://github.com/Illusive7Man/ObservableForms/issues"
   },
   "name": "observable-forms",
   "dependencies": {
     "@popperjs/core": "^2.5.3",
     "rxjs": "^6.6.3"
   },
-  "description": "Adds observable streams to jQuery objects of forms and form inputs. Adds properties such as valueChanges and statusChanges (inspired by Angular) to $('#some-input').",
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^9.0.0",
     "@rollup/plugin-typescript": "^6.1.0",
@@ -23,7 +22,8 @@
     "tslib": "^2.0.1",
     "typescript": "^3.9.7"
   },
-  "homepage": "add later__",
+  "description": "Adds observable streams to jQuery objects of forms and form inputs. Adds properties such as valueChanges and statusChanges (inspired by Angular) to $('#some-input').",
+  "homepage": "https://github.com/Illusive7Man/ObservableForms",
   "keywords": [
     "jQuery",
     "form",
@@ -45,5 +45,5 @@
     "bundle:esm:min": "terser --ecma 6 --compress --mangle --module -o dist/index.min.js -- dist/index.js"
   },
   "type": "module",
-  "version": "0.9.0"
+  "version": "0.8.0"
 }
