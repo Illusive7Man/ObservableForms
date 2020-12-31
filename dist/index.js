@@ -3447,6 +3447,9 @@ var createPopper = /*#__PURE__*/popperGenerator({
   defaultModifiers: defaultModifiers
 }); // eslint-disable-next-line import/no-unused-modules
 
+function isNullOrWhitespace(searchTerm) {
+    return searchTerm == null || (/\S/.test(searchTerm)) === false;
+}
 function extractRadioGroups(jQueryObject) {
     let radioFields = (jQueryObject[0] instanceof HTMLFormElement ? jQueryObject.find('input') : jQueryObject).toArray().filter(element => element.getAttribute('type') === 'radio');
     let radioGroups = radioFields.reduce((acc, curr) => {
@@ -3516,6 +3519,9 @@ function disableValidation(jQueryObject, opts) {
     delete jQueryAnyObject._runValidator;
 }
 let registeredAttributeValidators = {};
+function registerAttributeValidators(attributeValidators) {
+    registeredAttributeValidators = Object.assign(Object.assign({}, attributeValidators), attributeValidators);
+}
 function attachPopper(jQueryObject) {
     let $popper = $(`
         <span class="popper validation" role="tooltip">
@@ -3934,5 +3940,435 @@ function addComplementaryGettersSetters(jQueryObject) {
     });
 }
 
-export { FormControlStatus, convertToFormControl, extendFormElements };
+/**
+ * @suppress {checkTypes,constantProperty,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
+
+/**
+ * A regular expression that matches valid e-mail addresses.
+ *
+ * At a high level, this regexp matches e-mail addresses of the format `local-part\@tld`, where:
+ * - `local-part` consists of one or more of the allowed characters (alphanumeric and some
+ *   punctuation symbols).
+ * - `local-part` cannot begin or end with a period (`.`).
+ * - `local-part` cannot be longer than 64 characters.
+ * - `tld` consists of one or more `labels` separated by periods (`.`). For example `localhost` or
+ *   `foo.com`.
+ * - A `label` consists of one or more of the allowed characters (alphanumeric, dashes (`-`) and
+ *   periods (`.`)).
+ * - A `label` cannot begin or end with a dash (`-`) or a period (`.`).
+ * - A `label` cannot be longer than 63 characters.
+ * - The whole address cannot be longer than 254 characters.
+ *
+ * ## Implementation background
+ *
+ * This regexp was ported over from AngularJS (see there for git history):
+ * https://github.com/angular/angular.js/blob/c133ef836/src/ng/directive/input.js#L27
+ * It is based on the
+ * [WHATWG version](https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address) with
+ * some enhancements to incorporate more RFC rules (such as rules related to domain names and the
+ * lengths of different parts of the address). The main differences from the WHATWG version are:
+ *   - Disallow `local-part` to begin or end with a period (`.`).
+ *   - Disallow `local-part` length to exceed 64 characters.
+ *   - Disallow total address length to exceed 254 characters.
+ *
+ * See [this commit](https://github.com/angular/angular.js/commit/f3f5cf72e) for more details.
+ * @type {?}
+ */
+const EMAIL_REGEXP = /^(?=.{1,254}$)(?=.{1,64}@)[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+/**
+ * \@description
+ * Provides a set of built-in validators that can be used by form controls.
+ *
+ * A validator is a function that processes a `FormControl` or collection of
+ * controls and returns an error map or null. A null map means that validation has passed.
+ *
+ * @see [Form Validation](/guide/form-validation)
+ *
+ * \@publicApi
+ */
+class Validators {
+    /**
+     * \@description
+     * Validator that requires the control's value to be greater than or equal to the provided number.
+     * The validator exists only as a function and not as a directive.
+     *
+     * \@usageNotes
+     *
+     * ### Validate against a minimum of 3
+     *
+     * ```typescript
+     * const control = new FormControl(2, Validators.min(3));
+     *
+     * console.log(control.errors); // {min: {min: 3, actual: 2}}
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} min
+     * @return {?} A validator function that returns an error map with the
+     * `min` property if the validation check fails, otherwise `null`.
+     *
+     */
+    static min(min) {
+        return (/**
+         * @param {?} $control
+         * @return {?}
+         */
+        ($control) => {
+            if (isNullOrWhitespace($control.val()) || isNullOrWhitespace(min)) {
+                return null; // don't validate empty values to allow optional controls
+            }
+            /** @type {?} */
+            const value = parseFloat($control.val());
+            // Controls with NaN values after parsing should be treated as not having a
+            // minimum, per the HTML forms spec: https://www.w3.org/TR/html5/forms.html#attr-input-min
+            return !isNaN(value) && value < min ? { 'min': { 'min': min, 'actual': $control.val() } } : null;
+        });
+    }
+    /**
+     * \@description
+     * Validator that requires the control's value to be less than or equal to the provided number.
+     * The validator exists only as a function and not as a directive.
+     *
+     * \@usageNotes
+     *
+     * ### Validate against a maximum of 15
+     *
+     * ```typescript
+     * const control = new FormControl(16, Validators.max(15));
+     *
+     * console.log(control.errors); // {max: {max: 15, actual: 16}}
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} max
+     * @return {?} A validator function that returns an error map with the
+     * `max` property if the validation check fails, otherwise `null`.
+     *
+     */
+    static max(max) {
+        return (/**
+         * @param {?} $control
+         * @return {?}
+         */
+        ($control) => {
+            if (isNullOrWhitespace($control.val()) || isNullOrWhitespace(max)) {
+                return null; // don't validate empty values to allow optional controls
+            }
+            /** @type {?} */
+            const value = parseFloat($control.val());
+            // Controls with NaN values after parsing should be treated as not having a
+            // maximum, per the HTML forms spec: https://www.w3.org/TR/html5/forms.html#attr-input-max
+            return !isNaN(value) && value > max ? { 'max': { 'max': max, 'actual': $control.val() } } : null;
+        });
+    }
+    /**
+     * \@description
+     * Validator that requires the control have a non-empty value.
+     *
+     * \@usageNotes
+     *
+     * ### Validate that the field is non-empty
+     *
+     * ```typescript
+     * const control = new FormControl('', Validators.required);
+     *
+     * console.log(control.errors); // {required: true}
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} $control
+     * @return {?} An error map with the `required` property
+     * if the validation check fails, otherwise `null`.
+     *
+     */
+    static required($control) {
+        let isRadioControl = checkIfRadioGroup($control);
+        return isRadioControl && $control.toArray().every(element => !element.checked) || !isRadioControl && isNullOrWhitespace($control.val()) ? { 'required': true } : null;
+    }
+    /**
+     * \@description
+     * Validator that requires the control's value be true. This validator is commonly
+     * used for required checkboxes.
+     *
+     * \@usageNotes
+     *
+     * ### Validate that the field value is true
+     *
+     * ```typescript
+     * const control = new FormControl('', Validators.requiredTrue);
+     *
+     * console.log(control.errors); // {required: true}
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} $control
+     * @return {?} An error map that contains the `required` property
+     * set to `true` if the validation check fails, otherwise `null`.
+     *
+     */
+    static requiredTrue($control) {
+        return $control.val().toLowerCase() === 'true' ? null : { 'required': true };
+    }
+    /**
+     * \@description
+     * Validator that requires the control's value pass an email validation test.
+     *
+     * Tests the value using a [regular expression](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions)
+     * pattern suitable for common usecases. The pattern is based on the definition of a valid email
+     * address in the [WHATWG HTML specification](https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address)
+     * with some enhancements to incorporate more RFC rules (such as rules related to domain names and
+     * the lengths of different parts of the address).
+     *
+     * The differences from the WHATWG version include:
+     * - Disallow `local-part` (the part before the `\@` symbol) to begin or end with a period (`.`).
+     * - Disallow `local-part` to be longer than 64 characters.
+     * - Disallow the whole address to be longer than 254 characters.
+     *
+     * If this pattern does not satisfy your business needs, you can use `Validators.pattern()` to
+     * validate the value against a different pattern.
+     *
+     * \@usageNotes
+     *
+     * ### Validate that the field matches a valid email pattern
+     *
+     * ```typescript
+     * const control = new FormControl('bad\@', Validators.email);
+     *
+     * console.log(control.errors); // {email: true}
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} $control
+     * @return {?} An error map with the `email` property
+     * if the validation check fails, otherwise `null`.
+     *
+     */
+    static email($control) {
+        if (isNullOrWhitespace($control.val())) {
+            return null; // don't validate empty values to allow optional controls
+        }
+        return EMAIL_REGEXP.test($control.val()) ? null : { 'email': true };
+    }
+    /**
+     * \@description
+     * Validator that requires the length of the control's value to be greater than or equal
+     * to the provided minimum length. This validator is also provided by default if you use the
+     * the HTML5 `minlength` attribute.
+     *
+     * \@usageNotes
+     *
+     * ### Validate that the field has a minimum of 3 characters
+     *
+     * ```typescript
+     * const control = new FormControl('ng', Validators.minLength(3));
+     *
+     * console.log(control.errors); // {minlength: {requiredLength: 3, actualLength: 2}}
+     * ```
+     *
+     * ```html
+     * <input minlength="5">
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} minLength
+     * @return {?} A validator function that returns an error map with the
+     * `minlength` if the validation check fails, otherwise `null`.
+     *
+     */
+    static minLength(minLength) {
+        return (/**
+         * @param {?} $control
+         * @return {?}
+         */
+        ($control) => {
+            if (isNullOrWhitespace($control.val())) {
+                return null; // don't validate empty values to allow optional controls
+            }
+            /** @type {?} */
+            const length = $control.val() ? $control.val().length : 0;
+            return length < minLength ?
+                { 'minlength': { 'requiredLength': minLength, 'actualLength': length } } :
+                null;
+        });
+    }
+    /**
+     * \@description
+     * Validator that requires the length of the control's value to be less than or equal
+     * to the provided maximum length. This validator is also provided by default if you use the
+     * the HTML5 `maxlength` attribute.
+     *
+     * \@usageNotes
+     *
+     * ### Validate that the field has maximum of 5 characters
+     *
+     * ```typescript
+     * const control = new FormControl('Angular', Validators.maxLength(5));
+     *
+     * console.log(control.errors); // {maxlength: {requiredLength: 5, actualLength: 7}}
+     * ```
+     *
+     * ```html
+     * <input maxlength="5">
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} maxLength
+     * @return {?} A validator function that returns an error map with the
+     * `maxlength` property if the validation check fails, otherwise `null`.
+     *
+     */
+    static maxLength(maxLength) {
+        return (/**
+         * @param {?} $control
+         * @return {?}
+         */
+        ($control) => {
+            /** @type {?} */
+            const length = $control.val() ? $control.val().length : 0;
+            return length > maxLength ?
+                { 'maxlength': { 'requiredLength': maxLength, 'actualLength': length } } :
+                null;
+        });
+    }
+    /**
+     * \@description
+     * Validator that requires the control's value to match a regex pattern. This validator is also
+     * provided by default if you use the HTML5 `pattern` attribute.
+     *
+     * \@usageNotes
+     *
+     * ### Validate that the field only contains letters or spaces
+     *
+     * ```typescript
+     * const control = new FormControl('1', Validators.pattern('[a-zA-Z ]*'));
+     *
+     * console.log(control.errors); // {pattern: {requiredPattern: '^[a-zA-Z ]*$', actualValue: '1'}}
+     * ```
+     *
+     * ```html
+     * <input pattern="[a-zA-Z ]*">
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} pattern A regular expression to be used as is to test the values, or a string.
+     * If a string is passed, the `^` character is prepended and the `$` character is
+     * appended to the provided string (if not already present), and the resulting regular
+     * expression is used to test the values.
+     *
+     * @return {?} A validator function that returns an error map with the
+     * `pattern` property if the validation check fails, otherwise `null`.
+     *
+     */
+    static pattern(pattern) {
+        if (!pattern)
+            return Validators.nullValidator;
+        /** @type {?} */
+        let regex;
+        /** @type {?} */
+        let regexStr;
+        if (typeof pattern === 'string') {
+            regexStr = '';
+            if (pattern.charAt(0) !== '^')
+                regexStr += '^';
+            regexStr += pattern;
+            if (pattern.charAt(pattern.length - 1) !== '$')
+                regexStr += '$';
+            regex = new RegExp(regexStr);
+        }
+        else {
+            regexStr = pattern.toString();
+            regex = pattern;
+        }
+        return (/**
+         * @param {?} $control
+         * @return {?}
+         */
+        ($control) => {
+            if (isNullOrWhitespace($control.val())) {
+                return null; // don't validate empty values to allow optional controls
+            }
+            /** @type {?} */
+            const value = $control.val();
+            return regex.test(value) ? null :
+                { 'pattern': { 'requiredPattern': regexStr, 'actualValue': value } };
+        });
+    }
+    /**
+     * \@description
+     * Validator that performs no operation.
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} control
+     * @return {?}
+     */
+    static nullValidator(control) { return null; }
+    /**
+     * @param {?} validators
+     * @return {?}
+     */
+    static compose(validators) {
+        if (!validators)
+            return null;
+        /** @type {?} */
+        const presentValidators = (/** @type {?} */ (validators.filter(isPresent)));
+        if (presentValidators.length == 0)
+            return null;
+        return (/**
+         * @param {?} control
+         * @return {?}
+         */
+        function (control) {
+            return _mergeErrors(_executeValidators(control, presentValidators));
+        });
+    }
+}
+/**
+ * @param {?} o
+ * @return {?}
+ */
+function isPresent(o) {
+    return o != null;
+}
+/**
+ * @param {?} control
+ * @param {?} validators
+ * @return {?}
+ */
+function _executeValidators(control, validators) {
+    return validators.map((/**
+     * @param {?} v
+     * @return {?}
+     */
+    v => v(control)));
+}
+/**
+ * @param {?} arrayOfErrors
+ * @return {?}
+ */
+function _mergeErrors(arrayOfErrors) {
+    /** @type {?} */
+    const res = arrayOfErrors.reduce((/**
+     * @param {?} res
+     * @param {?} errors
+     * @return {?}
+     */
+    (res, errors) => {
+        return errors != null ? Object.assign({}, (/** @type {?} */ (res)), errors) : (/** @type {?} */ (res));
+    }), {});
+    return Object.keys(res).length === 0 ? null : res;
+}
+
+extendFormElements();
+
+export { FormControlStatus, Validators, checkIfRadioGroup, convertToFormControl, extractRadioGroups, getCheckboxValue, isFormControlType, isNullOrWhitespace, registerAttributeValidators };
 //# sourceMappingURL=index.js.map

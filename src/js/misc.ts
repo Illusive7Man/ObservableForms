@@ -1,4 +1,8 @@
 
+export function isNullOrWhitespace(searchTerm: string): boolean {
+    return searchTerm == null || (/\S/.test(searchTerm)) === false;
+}
+
 /*========================== Input functionality ==========================*/
 
 export function extractRadioGroups(jQueryObject: JQuery<FormControlType | HTMLFormElement>): {[name: string]: FormControlType[]} {

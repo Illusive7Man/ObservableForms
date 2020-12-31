@@ -9,7 +9,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {checkIfRadioGroup, isNullOrWhitespace as isEmptyInputValue} from "../../misc";
+import {checkIfRadioGroup, isNullOrWhitespace as isEmptyInputValue} from "./misc";
 
 /**
  * A regular expression that matches valid e-mail addresses.

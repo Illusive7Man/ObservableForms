@@ -1,3 +1,9 @@
+export { convertToFormControl, getCheckboxValue} from './input';
+export { FormControlStatus, registerAttributeValidators } from './validation';
+export * from './misc';
+export {Validators} from './validators';
 
-export { extendFormElements, convertToFormControl} from './input';
-export { FormControlStatus } from './validation'
+import {extendFormElements} from './input';
+extendFormElements();
+
+

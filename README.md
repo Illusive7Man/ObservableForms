@@ -2,15 +2,15 @@
 Inspired by Angular's forms.
 
 Adds observable streams to jQuery objects of forms and form inputs. <br/>
-Properties such as **valueChanges, statusChanges, touched, setValidators** etc., are added to the jQuery object, `let $formControl = $('#some-input')`.<br />
+Properties such as **valueChanges, statusChanges, touched, setValidators** etc., are added to the jQuery object,<br />`let $formControl = $('#some-input')`.<br />
 List of properties is available in the [type file](src/js/@types/input.d.ts).
 
 Controlling form's behavior and validation in Angular is such a straightforward task that I had to implement some of the workflow in jQuery.<br/>
-It is mostly thanks to reactive programming (RxJs), which is made possible by these observable streams.<br/>
+It is mostly thanks to reactive programming (RxJS), which is made possible by these observable streams.<br/>
 _Note that Visual Studio, JetBrains and possible every other code editor will have type support and offer documentation for the added properties._
 
 #### Prerequisites:
-- If you have knowledge of RxJs, this plug-in is a must.<br/>
+- If you have knowledge of RxJS, this plug-in is a must.<br/>
 - If you don't, you might want to see if the built-in behavior of the plug-in, i.e. how it handles front-end validation, and what additional API it offers for you to take advantage of. 
 
 ## Usage

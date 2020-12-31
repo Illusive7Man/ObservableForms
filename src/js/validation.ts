@@ -14,7 +14,7 @@ export enum FormControlStatus {
     DISABLED = 'DISABLED'
 }
 
-export function enableValidation(jQueryObject: JQuery<FormControlType | HTMLFormElement>, opts?: {onlySelf?: boolean; emitEvent?: boolean;}): void {
+export function enableValidation(jQueryObject: JQuery<FormControlType | HTMLFormElement>): void {
 
     // Check if it's already enabled
     if (jQueryObject.valid !== undefined)
@@ -38,7 +38,8 @@ export function enableValidation(jQueryObject: JQuery<FormControlType | HTMLForm
     
     let statusChangesSubject = new Subject<FormControlStatus>();
     jQueryObject.statusChangesSubject = statusChangesSubject;
-    
+
+    let sub1 =
     jQueryObject.selectedFormControls$.pipe(
         switchMap(selectedFormControls => merge(
         selectedFormControls.length === 0 ? NEVER : selectedFormControls.length === 1 ? jQueryObject.valueChanges : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.statusChanges)).pipe(delay(1)),
@@ -60,10 +61,12 @@ export function enableValidation(jQueryObject: JQuery<FormControlType | HTMLForm
     jQueryObject.statusChanges.subscribe(status => jQueryObject.status = status);
 
     attachPopper(jQueryObject);
+
+    jQueryObject._existingValidationSubscription = sub1;
 }
 
 
-export function updateValidity(jQueryObject: JQuery<FormControlType | HTMLFormElement>, opts?: { onlySelf?: boolean; emitEvent?: boolean; }): void {
+export function updateValidity(jQueryObject: JQuery<FormControlType | HTMLFormElement>): void {
     jQueryObject.manualValidityUpdateSubject.next();
 }
 
@@ -76,17 +79,15 @@ export function getValidators(jQueryObject: JQuery<FormControlType>): ValidatorF
     return jQueryObject._validators ?? null;
 }
 
-export function disableValidation(jQueryObject: JQuery<FormControlType>, opts?: {onlySelf?: boolean; emitEvent?: boolean;}): void {
-    // Functions configures mostly private properties
-    let jQueryAnyObject = jQueryObject as any;
+export function disableValidation(jQueryObject: JQuery<FormControlType>): void {
 
-    if (jQueryAnyObject._existingValidationSubscription)
-        jQueryAnyObject._existingValidationSubscription.unsubscribe();
+    jQueryObject._existingValidationSubscription.unsubscribe();
+    delete jQueryObject._existingValidationSubscription;
+    jQueryObject.statusChangesSubject.complete();
+    delete jQueryObject.statusChangesSubject;
 
-    delete jQueryAnyObject.valid;
-    delete jQueryAnyObject.invalid;
-    delete jQueryAnyObject._existingValidationSubscription;
-    delete jQueryAnyObject._runValidator;
+    delete jQueryObject.valid;
+    delete jQueryObject.invalid;
 }
 
 
@@ -174,6 +175,10 @@ export function attachPopper(jQueryObject: JQuery<FormControlType | HTMLFormElem
     });
     
     // TODO: popper.update nakon show/hide
+}
+
+export function hasError(jQueryObject: JQuery<FormControlType | HTMLFormElement>, errorCode: string): boolean {
+    return Object.keys(jQueryObject.errors).some(key => key === errorCode);
 }
 
 /*========================== Private Part ==========================*/

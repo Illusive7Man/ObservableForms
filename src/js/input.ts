@@ -1,6 +1,6 @@
 ﻿import {BehaviorSubject, EMPTY, fromEvent, merge, Observable, Subject} from "rxjs";
 import {delay, distinctUntilChanged, filter, map, share, skip, switchMap, tap} from "rxjs/operators";
-import {disableValidation, enableValidation, FormControlStatus, getValidators, setValidators, updateValidity} from "./validation";
+import {disableValidation, enableValidation, FormControlStatus, getValidators, hasError, setValidators, updateValidity} from "./validation";
 import {checkIfRadioGroup, extractRadioGroups, isFormControlType} from "./misc";
 import JQuery = JQueryInternal.JQueryInternal;
 import {JQueryInternal} from "./@types/input";
@@ -94,11 +94,11 @@ export function extendFormElements(): void {
                 $d?.dirtySubject?.next(false);
             })
         },
-        enableValidation(opts?: { onlySelf?: boolean; }): void {
-            enableValidation(this, opts);
+        enableValidation(): void {
+            enableValidation(this);
         },
-        disableValidation(opts?: { onlySelf?: boolean; }): void {
-            disableValidation(this, opts);
+        disableValidation(): void {
+            disableValidation(this);
         },
         setValidators(newValidator: ValidatorFn[] | null): void {
             return setValidators(this, newValidator);
@@ -108,6 +108,9 @@ export function extendFormElements(): void {
         },
         updateValidity(): void {
             return updateValidity(this);
+        },
+        hasError(errorCode: string): boolean {
+            return hasError(this, errorCode);
         },
         reset(): void {
             this.markAsUntouched();
