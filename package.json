@@ -35,8 +35,7 @@
   "main": "src/js/index.ts",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/adobe/spectrum-web-components.git",
-    "directory": "packages/circle-loader"
+    "url": "git+https://github.com/Illusive7Man/ObservableForms.git"
   },
   "scripts": {
     "clean": "if exist dist rmdir /s /q dist",
