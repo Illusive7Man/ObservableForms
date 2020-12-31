@@ -146,11 +146,23 @@ export function extendFormElements(): void {
 
     let originalInit = (jQuery.fn as any).init;
 
-    // formControl is the same as jQuery.fn.init, but with a more indicative name
-    let formControl = function (args): void {
-        return originalInit.apply(this, args);
+    /**
+     * Form control is the extended jQuery object of a single input element.
+     */
+    let formControl = function (jQueryObject): void {
+        originalInit.call(this, jQueryObject);
+        this.isFormControl = true;
     };
-    formControl.prototype = originalInit.prototype;
+
+    /**
+     * Form group is the extended jQuery object of multiple input elements, or a form.
+     */
+    let formGroup = function (jQueryObject): void {
+        originalInit.call(this, jQueryObject);
+        this.isFormControl = true;
+    };
+    formControl.prototype = new originalInit();
+    formGroup.prototype = new originalInit();
 
     // Constructor
     (jQuery.fn as any).init = function () {
@@ -159,11 +171,15 @@ export function extendFormElements(): void {
         if (areFormControlsSelected(jQueryObject) === false)
             return jQueryObject;
 
-        return convertToFormControl(new formControl(arguments) as JQuery<FormControlType | HTMLFormElement>);
+        return convertToFormControl(isGroupSelected(jQueryObject) ? new formGroup(jQueryObject) : new formControl(jQueryObject));
     }
 
     function areFormControlsSelected(jQueryObject: JQuery<HTMLElement>): boolean {
         return jQueryObject.toArray().some(singleJQueryObject => isFormControlType(singleJQueryObject) || singleJQueryObject instanceof HTMLFormElement);
+    }
+
+    function isGroupSelected(jQueryObject: JQuery<HTMLElement>): boolean {
+        return jQueryObject.toArray().filter(singleJQueryObject => isFormControlType(singleJQueryObject)).length > 1 || jQueryObject[0] instanceof HTMLFormElement;
     }
 }
 
@@ -210,7 +226,6 @@ export function convertToFormControl(jQueryObject: JQuery<FormControlType | HTML
 
     // Cache it
     addToCache(jQueryObject);
-    jQueryObject.isFormControl = true;
 
     return jQueryObject as JQuery<FormControlType>;
 }
