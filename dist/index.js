@@ -1380,49 +1380,6 @@ var MapSubscriber = /*@__PURE__*/ (function (_super) {
     return MapSubscriber;
 }(Subscriber));
 
-/** PURE_IMPORTS_START tslib,_Subscriber PURE_IMPORTS_END */
-var OuterSubscriber = /*@__PURE__*/ (function (_super) {
-    __extends(OuterSubscriber, _super);
-    function OuterSubscriber() {
-        return _super !== null && _super.apply(this, arguments) || this;
-    }
-    OuterSubscriber.prototype.notifyNext = function (outerValue, innerValue, outerIndex, innerIndex, innerSub) {
-        this.destination.next(innerValue);
-    };
-    OuterSubscriber.prototype.notifyError = function (error, innerSub) {
-        this.destination.error(error);
-    };
-    OuterSubscriber.prototype.notifyComplete = function (innerSub) {
-        this.destination.complete();
-    };
-    return OuterSubscriber;
-}(Subscriber));
-
-/** PURE_IMPORTS_START tslib,_Subscriber PURE_IMPORTS_END */
-var InnerSubscriber = /*@__PURE__*/ (function (_super) {
-    __extends(InnerSubscriber, _super);
-    function InnerSubscriber(parent, outerValue, outerIndex) {
-        var _this = _super.call(this) || this;
-        _this.parent = parent;
-        _this.outerValue = outerValue;
-        _this.outerIndex = outerIndex;
-        _this.index = 0;
-        return _this;
-    }
-    InnerSubscriber.prototype._next = function (value) {
-        this.parent.notifyNext(this.outerValue, value, this.outerIndex, this.index++, this);
-    };
-    InnerSubscriber.prototype._error = function (error) {
-        this.parent.notifyError(error, this);
-        this.unsubscribe();
-    };
-    InnerSubscriber.prototype._complete = function () {
-        this.parent.notifyComplete(this);
-        this.unsubscribe();
-    };
-    return InnerSubscriber;
-}(Subscriber));
-
 /** PURE_IMPORTS_START _hostReportError PURE_IMPORTS_END */
 var subscribeToPromise = function (promise) {
     return function (subscriber) {
@@ -1521,113 +1478,6 @@ var subscribeTo = function (result) {
         throw new TypeError(msg);
     }
 };
-
-/** PURE_IMPORTS_START _InnerSubscriber,_subscribeTo,_Observable PURE_IMPORTS_END */
-function subscribeToResult(outerSubscriber, result, outerValue, outerIndex, innerSubscriber) {
-    if (innerSubscriber === void 0) {
-        innerSubscriber = new InnerSubscriber(outerSubscriber, outerValue, outerIndex);
-    }
-    if (innerSubscriber.closed) {
-        return undefined;
-    }
-    if (result instanceof Observable) {
-        return result.subscribe(innerSubscriber);
-    }
-    return subscribeTo(result)(innerSubscriber);
-}
-
-/** PURE_IMPORTS_START tslib,_util_isScheduler,_util_isArray,_OuterSubscriber,_util_subscribeToResult,_fromArray PURE_IMPORTS_END */
-var NONE = {};
-function combineLatest() {
-    var observables = [];
-    for (var _i = 0; _i < arguments.length; _i++) {
-        observables[_i] = arguments[_i];
-    }
-    var resultSelector = undefined;
-    var scheduler = undefined;
-    if (isScheduler(observables[observables.length - 1])) {
-        scheduler = observables.pop();
-    }
-    if (typeof observables[observables.length - 1] === 'function') {
-        resultSelector = observables.pop();
-    }
-    if (observables.length === 1 && isArray(observables[0])) {
-        observables = observables[0];
-    }
-    return fromArray(observables, scheduler).lift(new CombineLatestOperator(resultSelector));
-}
-var CombineLatestOperator = /*@__PURE__*/ (function () {
-    function CombineLatestOperator(resultSelector) {
-        this.resultSelector = resultSelector;
-    }
-    CombineLatestOperator.prototype.call = function (subscriber, source) {
-        return source.subscribe(new CombineLatestSubscriber(subscriber, this.resultSelector));
-    };
-    return CombineLatestOperator;
-}());
-var CombineLatestSubscriber = /*@__PURE__*/ (function (_super) {
-    __extends(CombineLatestSubscriber, _super);
-    function CombineLatestSubscriber(destination, resultSelector) {
-        var _this = _super.call(this, destination) || this;
-        _this.resultSelector = resultSelector;
-        _this.active = 0;
-        _this.values = [];
-        _this.observables = [];
-        return _this;
-    }
-    CombineLatestSubscriber.prototype._next = function (observable) {
-        this.values.push(NONE);
-        this.observables.push(observable);
-    };
-    CombineLatestSubscriber.prototype._complete = function () {
-        var observables = this.observables;
-        var len = observables.length;
-        if (len === 0) {
-            this.destination.complete();
-        }
-        else {
-            this.active = len;
-            this.toRespond = len;
-            for (var i = 0; i < len; i++) {
-                var observable = observables[i];
-                this.add(subscribeToResult(this, observable, undefined, i));
-            }
-        }
-    };
-    CombineLatestSubscriber.prototype.notifyComplete = function (unused) {
-        if ((this.active -= 1) === 0) {
-            this.destination.complete();
-        }
-    };
-    CombineLatestSubscriber.prototype.notifyNext = function (_outerValue, innerValue, outerIndex) {
-        var values = this.values;
-        var oldVal = values[outerIndex];
-        var toRespond = !this.toRespond
-            ? 0
-            : oldVal === NONE ? --this.toRespond : this.toRespond;
-        values[outerIndex] = innerValue;
-        if (toRespond === 0) {
-            if (this.resultSelector) {
-                this._tryResultSelector(values);
-            }
-            else {
-                this.destination.next(values.slice());
-            }
-        }
-    };
-    CombineLatestSubscriber.prototype._tryResultSelector = function (values) {
-        var result;
-        try {
-            result = this.resultSelector.apply(this, values);
-        }
-        catch (err) {
-            this.destination.error(err);
-            return;
-        }
-        this.destination.next(result);
-    };
-    return CombineLatestSubscriber;
-}(OuterSubscriber));
 
 /** PURE_IMPORTS_START _Observable,_Subscription,_symbol_observable PURE_IMPORTS_END */
 function scheduleObservable(input, scheduler) {
@@ -1969,11 +1819,6 @@ function isEventTarget(sourceObj) {
     return sourceObj && typeof sourceObj.addEventListener === 'function' && typeof sourceObj.removeEventListener === 'function';
 }
 
-/** PURE_IMPORTS_START _isArray PURE_IMPORTS_END */
-function isNumeric(val) {
-    return !isArray(val) && (val - parseFloat(val) + 1) >= 0;
-}
-
 /** PURE_IMPORTS_START _Observable,_util_isScheduler,_operators_mergeAll,_fromArray PURE_IMPORTS_END */
 function merge() {
     var observables = [];
@@ -2041,43 +1886,6 @@ var FilterSubscriber = /*@__PURE__*/ (function (_super) {
     };
     return FilterSubscriber;
 }(Subscriber));
-
-/** PURE_IMPORTS_START _Observable,_scheduler_async,_util_isNumeric,_util_isScheduler PURE_IMPORTS_END */
-function timer(dueTime, periodOrScheduler, scheduler) {
-    if (dueTime === void 0) {
-        dueTime = 0;
-    }
-    var period = -1;
-    if (isNumeric(periodOrScheduler)) {
-        period = Number(periodOrScheduler) < 1 && 1 || Number(periodOrScheduler);
-    }
-    else if (isScheduler(periodOrScheduler)) {
-        scheduler = periodOrScheduler;
-    }
-    if (!isScheduler(scheduler)) {
-        scheduler = async;
-    }
-    return new Observable(function (subscriber) {
-        var due = isNumeric(dueTime)
-            ? dueTime
-            : (+dueTime - scheduler.now());
-        return scheduler.schedule(dispatch$1, due, {
-            index: 0, period: period, subscriber: subscriber
-        });
-    });
-}
-function dispatch$1(state) {
-    var index = state.index, period = state.period, subscriber = state.subscriber;
-    subscriber.next(index);
-    if (subscriber.closed) {
-        return;
-    }
-    else if (period === -1) {
-        return subscriber.complete();
-    }
-    state.index = index + 1;
-    this.schedule(state, period);
-}
 
 /** PURE_IMPORTS_START  PURE_IMPORTS_END */
 function isDate(value) {
@@ -3447,9 +3255,930 @@ var createPopper = /*#__PURE__*/popperGenerator({
   defaultModifiers: defaultModifiers
 }); // eslint-disable-next-line import/no-unused-modules
 
+var hash = {
+  left: 'right',
+  right: 'left',
+  bottom: 'top',
+  top: 'bottom'
+};
+function getOppositePlacement(placement) {
+  return placement.replace(/left|right|bottom|top/g, function (matched) {
+    return hash[matched];
+  });
+}
+
+var top$1 = 'top';
+var bottom$1 = 'bottom';
+var right$1 = 'right';
+var left$1 = 'left';
+var auto = 'auto';
+var basePlacements = [top$1, bottom$1, right$1, left$1];
+var start$1 = 'start';
+var end$1 = 'end';
+var clippingParents = 'clippingParents';
+var viewport = 'viewport';
+var popper = 'popper';
+var reference = 'reference';
+var variationPlacements = /*#__PURE__*/basePlacements.reduce(function (acc, placement) {
+  return acc.concat([placement + "-" + start$1, placement + "-" + end$1]);
+}, []);
+var placements = /*#__PURE__*/[].concat(basePlacements, [auto]).reduce(function (acc, placement) {
+  return acc.concat([placement, placement + "-" + start$1, placement + "-" + end$1]);
+}, []); // modifiers that need to read the DOM
+
+function getBasePlacement$1(placement) {
+  return placement.split('-')[0];
+}
+
+var hash$1 = {
+  start: 'end',
+  end: 'start'
+};
+function getOppositeVariationPlacement(placement) {
+  return placement.replace(/start|end/g, function (matched) {
+    return hash$1[matched];
+  });
+}
+
+function getBoundingClientRect$1(element) {
+  var rect = element.getBoundingClientRect();
+  return {
+    width: rect.width,
+    height: rect.height,
+    top: rect.top,
+    right: rect.right,
+    bottom: rect.bottom,
+    left: rect.left,
+    x: rect.left,
+    y: rect.top
+  };
+}
+
+/*:: import type { Window } from '../types'; */
+
+/*:: declare function getWindow(node: Node | Window): Window; */
+function getWindow$1(node) {
+  if (node.toString() !== '[object Window]') {
+    var ownerDocument = node.ownerDocument;
+    return ownerDocument ? ownerDocument.defaultView || window : window;
+  }
+
+  return node;
+}
+
+/*:: declare function isElement(node: mixed): boolean %checks(node instanceof
+  Element); */
+
+function isElement$1(node) {
+  var OwnElement = getWindow$1(node).Element;
+  return node instanceof OwnElement || node instanceof Element;
+}
+/*:: declare function isHTMLElement(node: mixed): boolean %checks(node instanceof
+  HTMLElement); */
+
+
+function isHTMLElement$1(node) {
+  var OwnElement = getWindow$1(node).HTMLElement;
+  return node instanceof OwnElement || node instanceof HTMLElement;
+}
+/*:: declare function isShadowRoot(node: mixed): boolean %checks(node instanceof
+  ShadowRoot); */
+
+
+function isShadowRoot(node) {
+  var OwnElement = getWindow$1(node).ShadowRoot;
+  return node instanceof OwnElement || node instanceof ShadowRoot;
+}
+
+function getDocumentElement$1(element) {
+  // $FlowFixMe[incompatible-return]: assume body is always available
+  return ((isElement$1(element) ? element.ownerDocument : // $FlowFixMe[prop-missing]
+  element.document) || window.document).documentElement;
+}
+
+function getWindowScroll$1(node) {
+  var win = getWindow$1(node);
+  var scrollLeft = win.pageXOffset;
+  var scrollTop = win.pageYOffset;
+  return {
+    scrollLeft: scrollLeft,
+    scrollTop: scrollTop
+  };
+}
+
+function getWindowScrollBarX$1(element) {
+  // If <html> has a CSS width greater than the viewport, then this will be
+  // incorrect for RTL.
+  // Popper 1 is broken in this case and never had a bug report so let's assume
+  // it's not an issue. I don't think anyone ever specifies width on <html>
+  // anyway.
+  // Browsers where the left scrollbar doesn't cause an issue report `0` for
+  // this (e.g. Edge 2019, IE11, Safari)
+  return getBoundingClientRect$1(getDocumentElement$1(element)).left + getWindowScroll$1(element).scrollLeft;
+}
+
+function getViewportRect(element) {
+  var win = getWindow$1(element);
+  var html = getDocumentElement$1(element);
+  var visualViewport = win.visualViewport;
+  var width = html.clientWidth;
+  var height = html.clientHeight;
+  var x = 0;
+  var y = 0; // NB: This isn't supported on iOS <= 12. If the keyboard is open, the popper
+  // can be obscured underneath it.
+  // Also, `html.clientHeight` adds the bottom bar height in Safari iOS, even
+  // if it isn't open, so if this isn't available, the popper will be detected
+  // to overflow the bottom of the screen too early.
+
+  if (visualViewport) {
+    width = visualViewport.width;
+    height = visualViewport.height; // Uses Layout Viewport (like Chrome; Safari does not currently)
+    // In Chrome, it returns a value very close to 0 (+/-) but contains rounding
+    // errors due to floating point numbers, so we need to check precision.
+    // Safari returns a number <= 0, usually < -1 when pinch-zoomed
+    // Feature detection fails in mobile emulation mode in Chrome.
+    // Math.abs(win.innerWidth / visualViewport.scale - visualViewport.width) <
+    // 0.001
+    // Fallback here: "Not Safari" userAgent
+
+    if (!/^((?!chrome|android).)*safari/i.test(navigator.userAgent)) {
+      x = visualViewport.offsetLeft;
+      y = visualViewport.offsetTop;
+    }
+  }
+
+  return {
+    width: width,
+    height: height,
+    x: x + getWindowScrollBarX$1(element),
+    y: y
+  };
+}
+
+function getComputedStyle$1(element) {
+  return getWindow$1(element).getComputedStyle(element);
+}
+
+// of the `<html>` and `<body>` rect bounds if horizontally scrollable
+
+function getDocumentRect(element) {
+  var html = getDocumentElement$1(element);
+  var winScroll = getWindowScroll$1(element);
+  var body = element.ownerDocument.body;
+  var width = Math.max(html.scrollWidth, html.clientWidth, body ? body.scrollWidth : 0, body ? body.clientWidth : 0);
+  var height = Math.max(html.scrollHeight, html.clientHeight, body ? body.scrollHeight : 0, body ? body.clientHeight : 0);
+  var x = -winScroll.scrollLeft + getWindowScrollBarX$1(element);
+  var y = -winScroll.scrollTop;
+
+  if (getComputedStyle$1(body || html).direction === 'rtl') {
+    x += Math.max(html.clientWidth, body ? body.clientWidth : 0) - width;
+  }
+
+  return {
+    width: width,
+    height: height,
+    x: x,
+    y: y
+  };
+}
+
+function getNodeName$1(element) {
+  return element ? (element.nodeName || '').toLowerCase() : null;
+}
+
+function getParentNode$1(element) {
+  if (getNodeName$1(element) === 'html') {
+    return element;
+  }
+
+  return (// this is a quicker (but less type safe) way to save quite some bytes from the bundle
+    // $FlowFixMe[incompatible-return]
+    // $FlowFixMe[prop-missing]
+    element.assignedSlot || // step into the shadow DOM of the parent of a slotted node
+    element.parentNode || // DOM Element detected
+    // $FlowFixMe[incompatible-return]: need a better way to handle this...
+    element.host || // ShadowRoot detected
+    // $FlowFixMe[incompatible-call]: HTMLElement is a Node
+    getDocumentElement$1(element) // fallback
+
+  );
+}
+
+function isScrollParent$1(element) {
+  // Firefox wants us to check `-x` and `-y` variations as well
+  var _getComputedStyle = getComputedStyle$1(element),
+      overflow = _getComputedStyle.overflow,
+      overflowX = _getComputedStyle.overflowX,
+      overflowY = _getComputedStyle.overflowY;
+
+  return /auto|scroll|overlay|hidden/.test(overflow + overflowY + overflowX);
+}
+
+function getScrollParent$1(node) {
+  if (['html', 'body', '#document'].indexOf(getNodeName$1(node)) >= 0) {
+    // $FlowFixMe[incompatible-return]: assume body is always available
+    return node.ownerDocument.body;
+  }
+
+  if (isHTMLElement$1(node) && isScrollParent$1(node)) {
+    return node;
+  }
+
+  return getScrollParent$1(getParentNode$1(node));
+}
+
+/*
+given a DOM element, return the list of all scroll parents, up the list of ancesors
+until we get to the top window object. This list is what we attach scroll listeners
+to, because if any of these parent elements scroll, we'll need to re-calculate the
+reference element's position.
+*/
+
+function listScrollParents$1(element, list) {
+  if (list === void 0) {
+    list = [];
+  }
+
+  var scrollParent = getScrollParent$1(element);
+  var isBody = getNodeName$1(scrollParent) === 'body';
+  var win = getWindow$1(scrollParent);
+  var target = isBody ? [win].concat(win.visualViewport || [], isScrollParent$1(scrollParent) ? scrollParent : []) : scrollParent;
+  var updatedList = list.concat(target);
+  return isBody ? updatedList : // $FlowFixMe[incompatible-call]: isBody tells us target will be an HTMLElement here
+  updatedList.concat(listScrollParents$1(getParentNode$1(target)));
+}
+
+function isTableElement$1(element) {
+  return ['table', 'td', 'th'].indexOf(getNodeName$1(element)) >= 0;
+}
+
+function getTrueOffsetParent$1(element) {
+  if (!isHTMLElement$1(element) || // https://github.com/popperjs/popper-core/issues/837
+  getComputedStyle$1(element).position === 'fixed') {
+    return null;
+  }
+
+  var offsetParent = element.offsetParent;
+
+  if (offsetParent) {
+    var html = getDocumentElement$1(offsetParent);
+
+    if (getNodeName$1(offsetParent) === 'body' && getComputedStyle$1(offsetParent).position === 'static' && getComputedStyle$1(html).position !== 'static') {
+      return html;
+    }
+  }
+
+  return offsetParent;
+} // `.offsetParent` reports `null` for fixed elements, while absolute elements
+// return the containing block
+
+
+function getContainingBlock$1(element) {
+  var currentNode = getParentNode$1(element);
+
+  while (isHTMLElement$1(currentNode) && ['html', 'body'].indexOf(getNodeName$1(currentNode)) < 0) {
+    var css = getComputedStyle$1(currentNode); // This is non-exhaustive but covers the most common CSS properties that
+    // create a containing block.
+
+    if (css.transform !== 'none' || css.perspective !== 'none' || css.willChange && css.willChange !== 'auto') {
+      return currentNode;
+    } else {
+      currentNode = currentNode.parentNode;
+    }
+  }
+
+  return null;
+} // Gets the closest ancestor positioned element. Handles some edge cases,
+// such as table ancestors and cross browser bugs.
+
+
+function getOffsetParent$1(element) {
+  var window = getWindow$1(element);
+  var offsetParent = getTrueOffsetParent$1(element);
+
+  while (offsetParent && isTableElement$1(offsetParent) && getComputedStyle$1(offsetParent).position === 'static') {
+    offsetParent = getTrueOffsetParent$1(offsetParent);
+  }
+
+  if (offsetParent && getNodeName$1(offsetParent) === 'body' && getComputedStyle$1(offsetParent).position === 'static') {
+    return window;
+  }
+
+  return offsetParent || getContainingBlock$1(element) || window;
+}
+
+function contains(parent, child) {
+  var rootNode = child.getRootNode && child.getRootNode(); // First, attempt with faster native method
+
+  if (parent.contains(child)) {
+    return true;
+  } // then fallback to custom implementation with Shadow DOM support
+  else if (rootNode && isShadowRoot(rootNode)) {
+      var next = child;
+
+      do {
+        if (next && parent.isSameNode(next)) {
+          return true;
+        } // $FlowFixMe[prop-missing]: need a better way to handle this...
+
+
+        next = next.parentNode || next.host;
+      } while (next);
+    } // Give up, the result is false
+
+
+  return false;
+}
+
+function rectToClientRect(rect) {
+  return Object.assign(Object.assign({}, rect), {}, {
+    left: rect.x,
+    top: rect.y,
+    right: rect.x + rect.width,
+    bottom: rect.y + rect.height
+  });
+}
+
+function getInnerBoundingClientRect(element) {
+  var rect = getBoundingClientRect$1(element);
+  rect.top = rect.top + element.clientTop;
+  rect.left = rect.left + element.clientLeft;
+  rect.bottom = rect.top + element.clientHeight;
+  rect.right = rect.left + element.clientWidth;
+  rect.width = element.clientWidth;
+  rect.height = element.clientHeight;
+  rect.x = rect.left;
+  rect.y = rect.top;
+  return rect;
+}
+
+function getClientRectFromMixedType(element, clippingParent) {
+  return clippingParent === viewport ? rectToClientRect(getViewportRect(element)) : isHTMLElement$1(clippingParent) ? getInnerBoundingClientRect(clippingParent) : rectToClientRect(getDocumentRect(getDocumentElement$1(element)));
+} // A "clipping parent" is an overflowable container with the characteristic of
+// clipping (or hiding) overflowing elements with a position different from
+// `initial`
+
+
+function getClippingParents(element) {
+  var clippingParents = listScrollParents$1(getParentNode$1(element));
+  var canEscapeClipping = ['absolute', 'fixed'].indexOf(getComputedStyle$1(element).position) >= 0;
+  var clipperElement = canEscapeClipping && isHTMLElement$1(element) ? getOffsetParent$1(element) : element;
+
+  if (!isElement$1(clipperElement)) {
+    return [];
+  } // $FlowFixMe[incompatible-return]: https://github.com/facebook/flow/issues/1414
+
+
+  return clippingParents.filter(function (clippingParent) {
+    return isElement$1(clippingParent) && contains(clippingParent, clipperElement) && getNodeName$1(clippingParent) !== 'body';
+  });
+} // Gets the maximum area that the element is visible in due to any number of
+// clipping parents
+
+
+function getClippingRect(element, boundary, rootBoundary) {
+  var mainClippingParents = boundary === 'clippingParents' ? getClippingParents(element) : [].concat(boundary);
+  var clippingParents = [].concat(mainClippingParents, [rootBoundary]);
+  var firstClippingParent = clippingParents[0];
+  var clippingRect = clippingParents.reduce(function (accRect, clippingParent) {
+    var rect = getClientRectFromMixedType(element, clippingParent);
+    accRect.top = Math.max(rect.top, accRect.top);
+    accRect.right = Math.min(rect.right, accRect.right);
+    accRect.bottom = Math.min(rect.bottom, accRect.bottom);
+    accRect.left = Math.max(rect.left, accRect.left);
+    return accRect;
+  }, getClientRectFromMixedType(element, firstClippingParent));
+  clippingRect.width = clippingRect.right - clippingRect.left;
+  clippingRect.height = clippingRect.bottom - clippingRect.top;
+  clippingRect.x = clippingRect.left;
+  clippingRect.y = clippingRect.top;
+  return clippingRect;
+}
+
+function getVariation$1(placement) {
+  return placement.split('-')[1];
+}
+
+function getMainAxisFromPlacement$1(placement) {
+  return ['top', 'bottom'].indexOf(placement) >= 0 ? 'x' : 'y';
+}
+
+function computeOffsets$1(_ref) {
+  var reference = _ref.reference,
+      element = _ref.element,
+      placement = _ref.placement;
+  var basePlacement = placement ? getBasePlacement$1(placement) : null;
+  var variation = placement ? getVariation$1(placement) : null;
+  var commonX = reference.x + reference.width / 2 - element.width / 2;
+  var commonY = reference.y + reference.height / 2 - element.height / 2;
+  var offsets;
+
+  switch (basePlacement) {
+    case top$1:
+      offsets = {
+        x: commonX,
+        y: reference.y - element.height
+      };
+      break;
+
+    case bottom$1:
+      offsets = {
+        x: commonX,
+        y: reference.y + reference.height
+      };
+      break;
+
+    case right$1:
+      offsets = {
+        x: reference.x + reference.width,
+        y: commonY
+      };
+      break;
+
+    case left$1:
+      offsets = {
+        x: reference.x - element.width,
+        y: commonY
+      };
+      break;
+
+    default:
+      offsets = {
+        x: reference.x,
+        y: reference.y
+      };
+  }
+
+  var mainAxis = basePlacement ? getMainAxisFromPlacement$1(basePlacement) : null;
+
+  if (mainAxis != null) {
+    var len = mainAxis === 'y' ? 'height' : 'width';
+
+    switch (variation) {
+      case start$1:
+        offsets[mainAxis] = offsets[mainAxis] - (reference[len] / 2 - element[len] / 2);
+        break;
+
+      case end$1:
+        offsets[mainAxis] = offsets[mainAxis] + (reference[len] / 2 - element[len] / 2);
+        break;
+    }
+  }
+
+  return offsets;
+}
+
+function getFreshSideObject() {
+  return {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0
+  };
+}
+
+function mergePaddingObject(paddingObject) {
+  return Object.assign(Object.assign({}, getFreshSideObject()), paddingObject);
+}
+
+function expandToHashMap(value, keys) {
+  return keys.reduce(function (hashMap, key) {
+    hashMap[key] = value;
+    return hashMap;
+  }, {});
+}
+
+function detectOverflow(state, options) {
+  if (options === void 0) {
+    options = {};
+  }
+
+  var _options = options,
+      _options$placement = _options.placement,
+      placement = _options$placement === void 0 ? state.placement : _options$placement,
+      _options$boundary = _options.boundary,
+      boundary = _options$boundary === void 0 ? clippingParents : _options$boundary,
+      _options$rootBoundary = _options.rootBoundary,
+      rootBoundary = _options$rootBoundary === void 0 ? viewport : _options$rootBoundary,
+      _options$elementConte = _options.elementContext,
+      elementContext = _options$elementConte === void 0 ? popper : _options$elementConte,
+      _options$altBoundary = _options.altBoundary,
+      altBoundary = _options$altBoundary === void 0 ? false : _options$altBoundary,
+      _options$padding = _options.padding,
+      padding = _options$padding === void 0 ? 0 : _options$padding;
+  var paddingObject = mergePaddingObject(typeof padding !== 'number' ? padding : expandToHashMap(padding, basePlacements));
+  var altContext = elementContext === popper ? reference : popper;
+  var referenceElement = state.elements.reference;
+  var popperRect = state.rects.popper;
+  var element = state.elements[altBoundary ? altContext : elementContext];
+  var clippingClientRect = getClippingRect(isElement$1(element) ? element : element.contextElement || getDocumentElement$1(state.elements.popper), boundary, rootBoundary);
+  var referenceClientRect = getBoundingClientRect$1(referenceElement);
+  var popperOffsets = computeOffsets$1({
+    reference: referenceClientRect,
+    element: popperRect,
+    strategy: 'absolute',
+    placement: placement
+  });
+  var popperClientRect = rectToClientRect(Object.assign(Object.assign({}, popperRect), popperOffsets));
+  var elementClientRect = elementContext === popper ? popperClientRect : referenceClientRect; // positive = overflowing the clipping rect
+  // 0 or negative = within the clipping rect
+
+  var overflowOffsets = {
+    top: clippingClientRect.top - elementClientRect.top + paddingObject.top,
+    bottom: elementClientRect.bottom - clippingClientRect.bottom + paddingObject.bottom,
+    left: clippingClientRect.left - elementClientRect.left + paddingObject.left,
+    right: elementClientRect.right - clippingClientRect.right + paddingObject.right
+  };
+  var offsetData = state.modifiersData.offset; // Offsets can be applied only to the popper element
+
+  if (elementContext === popper && offsetData) {
+    var offset = offsetData[placement];
+    Object.keys(overflowOffsets).forEach(function (key) {
+      var multiply = [right$1, bottom$1].indexOf(key) >= 0 ? 1 : -1;
+      var axis = [top$1, bottom$1].indexOf(key) >= 0 ? 'y' : 'x';
+      overflowOffsets[key] += offset[axis] * multiply;
+    });
+  }
+
+  return overflowOffsets;
+}
+
+/*:: type OverflowsMap = { [ComputedPlacement]: number }; */
+
+/*;; type OverflowsMap = { [key in ComputedPlacement]: number }; */
+function computeAutoPlacement(state, options) {
+  if (options === void 0) {
+    options = {};
+  }
+
+  var _options = options,
+      placement = _options.placement,
+      boundary = _options.boundary,
+      rootBoundary = _options.rootBoundary,
+      padding = _options.padding,
+      flipVariations = _options.flipVariations,
+      _options$allowedAutoP = _options.allowedAutoPlacements,
+      allowedAutoPlacements = _options$allowedAutoP === void 0 ? placements : _options$allowedAutoP;
+  var variation = getVariation$1(placement);
+  var placements$1 = variation ? flipVariations ? variationPlacements : variationPlacements.filter(function (placement) {
+    return getVariation$1(placement) === variation;
+  }) : basePlacements;
+  var allowedPlacements = placements$1.filter(function (placement) {
+    return allowedAutoPlacements.indexOf(placement) >= 0;
+  });
+
+  if (allowedPlacements.length === 0) {
+    allowedPlacements = placements$1;
+
+    if (process.env.NODE_ENV !== "production") {
+      console.error(['Popper: The `allowedAutoPlacements` option did not allow any', 'placements. Ensure the `placement` option matches the variation', 'of the allowed placements.', 'For example, "auto" cannot be used to allow "bottom-start".', 'Use "auto-start" instead.'].join(' '));
+    }
+  } // $FlowFixMe[incompatible-type]: Flow seems to have problems with two array unions...
+
+
+  var overflows = allowedPlacements.reduce(function (acc, placement) {
+    acc[placement] = detectOverflow(state, {
+      placement: placement,
+      boundary: boundary,
+      rootBoundary: rootBoundary,
+      padding: padding
+    })[getBasePlacement$1(placement)];
+    return acc;
+  }, {});
+  return Object.keys(overflows).sort(function (a, b) {
+    return overflows[a] - overflows[b];
+  });
+}
+
+function getExpandedFallbackPlacements(placement) {
+  if (getBasePlacement$1(placement) === auto) {
+    return [];
+  }
+
+  var oppositePlacement = getOppositePlacement(placement);
+  return [getOppositeVariationPlacement(placement), oppositePlacement, getOppositeVariationPlacement(oppositePlacement)];
+}
+
+function flip(_ref) {
+  var state = _ref.state,
+      options = _ref.options,
+      name = _ref.name;
+
+  if (state.modifiersData[name]._skip) {
+    return;
+  }
+
+  var _options$mainAxis = options.mainAxis,
+      checkMainAxis = _options$mainAxis === void 0 ? true : _options$mainAxis,
+      _options$altAxis = options.altAxis,
+      checkAltAxis = _options$altAxis === void 0 ? true : _options$altAxis,
+      specifiedFallbackPlacements = options.fallbackPlacements,
+      padding = options.padding,
+      boundary = options.boundary,
+      rootBoundary = options.rootBoundary,
+      altBoundary = options.altBoundary,
+      _options$flipVariatio = options.flipVariations,
+      flipVariations = _options$flipVariatio === void 0 ? true : _options$flipVariatio,
+      allowedAutoPlacements = options.allowedAutoPlacements;
+  var preferredPlacement = state.options.placement;
+  var basePlacement = getBasePlacement$1(preferredPlacement);
+  var isBasePlacement = basePlacement === preferredPlacement;
+  var fallbackPlacements = specifiedFallbackPlacements || (isBasePlacement || !flipVariations ? [getOppositePlacement(preferredPlacement)] : getExpandedFallbackPlacements(preferredPlacement));
+  var placements = [preferredPlacement].concat(fallbackPlacements).reduce(function (acc, placement) {
+    return acc.concat(getBasePlacement$1(placement) === auto ? computeAutoPlacement(state, {
+      placement: placement,
+      boundary: boundary,
+      rootBoundary: rootBoundary,
+      padding: padding,
+      flipVariations: flipVariations,
+      allowedAutoPlacements: allowedAutoPlacements
+    }) : placement);
+  }, []);
+  var referenceRect = state.rects.reference;
+  var popperRect = state.rects.popper;
+  var checksMap = new Map();
+  var makeFallbackChecks = true;
+  var firstFittingPlacement = placements[0];
+
+  for (var i = 0; i < placements.length; i++) {
+    var placement = placements[i];
+
+    var _basePlacement = getBasePlacement$1(placement);
+
+    var isStartVariation = getVariation$1(placement) === start$1;
+    var isVertical = [top$1, bottom$1].indexOf(_basePlacement) >= 0;
+    var len = isVertical ? 'width' : 'height';
+    var overflow = detectOverflow(state, {
+      placement: placement,
+      boundary: boundary,
+      rootBoundary: rootBoundary,
+      altBoundary: altBoundary,
+      padding: padding
+    });
+    var mainVariationSide = isVertical ? isStartVariation ? right$1 : left$1 : isStartVariation ? bottom$1 : top$1;
+
+    if (referenceRect[len] > popperRect[len]) {
+      mainVariationSide = getOppositePlacement(mainVariationSide);
+    }
+
+    var altVariationSide = getOppositePlacement(mainVariationSide);
+    var checks = [];
+
+    if (checkMainAxis) {
+      checks.push(overflow[_basePlacement] <= 0);
+    }
+
+    if (checkAltAxis) {
+      checks.push(overflow[mainVariationSide] <= 0, overflow[altVariationSide] <= 0);
+    }
+
+    if (checks.every(function (check) {
+      return check;
+    })) {
+      firstFittingPlacement = placement;
+      makeFallbackChecks = false;
+      break;
+    }
+
+    checksMap.set(placement, checks);
+  }
+
+  if (makeFallbackChecks) {
+    // `2` may be desired in some cases – research later
+    var numberOfChecks = flipVariations ? 3 : 1;
+
+    var _loop = function _loop(_i) {
+      var fittingPlacement = placements.find(function (placement) {
+        var checks = checksMap.get(placement);
+
+        if (checks) {
+          return checks.slice(0, _i).every(function (check) {
+            return check;
+          });
+        }
+      });
+
+      if (fittingPlacement) {
+        firstFittingPlacement = fittingPlacement;
+        return "break";
+      }
+    };
+
+    for (var _i = numberOfChecks; _i > 0; _i--) {
+      var _ret = _loop(_i);
+
+      if (_ret === "break") break;
+    }
+  }
+
+  if (state.placement !== firstFittingPlacement) {
+    state.modifiersData[name]._skip = true;
+    state.placement = firstFittingPlacement;
+    state.reset = true;
+  }
+} // eslint-disable-next-line import/no-unused-modules
+
+
+var flip$1 = {
+  name: 'flip',
+  enabled: true,
+  phase: 'main',
+  fn: flip,
+  requiresIfExists: ['offset'],
+  data: {
+    _skip: false
+  }
+};
+
+function getAltAxis(axis) {
+  return axis === 'x' ? 'y' : 'x';
+}
+
+function within(min, value, max) {
+  return Math.max(min, Math.min(value, max));
+}
+
+// Returns the layout rect of an element relative to its offsetParent. Layout
+// means it doesn't take into account transforms.
+function getLayoutRect$1(element) {
+  return {
+    x: element.offsetLeft,
+    y: element.offsetTop,
+    width: element.offsetWidth,
+    height: element.offsetHeight
+  };
+}
+
+function preventOverflow(_ref) {
+  var state = _ref.state,
+      options = _ref.options,
+      name = _ref.name;
+  var _options$mainAxis = options.mainAxis,
+      checkMainAxis = _options$mainAxis === void 0 ? true : _options$mainAxis,
+      _options$altAxis = options.altAxis,
+      checkAltAxis = _options$altAxis === void 0 ? false : _options$altAxis,
+      boundary = options.boundary,
+      rootBoundary = options.rootBoundary,
+      altBoundary = options.altBoundary,
+      padding = options.padding,
+      _options$tether = options.tether,
+      tether = _options$tether === void 0 ? true : _options$tether,
+      _options$tetherOffset = options.tetherOffset,
+      tetherOffset = _options$tetherOffset === void 0 ? 0 : _options$tetherOffset;
+  var overflow = detectOverflow(state, {
+    boundary: boundary,
+    rootBoundary: rootBoundary,
+    padding: padding,
+    altBoundary: altBoundary
+  });
+  var basePlacement = getBasePlacement$1(state.placement);
+  var variation = getVariation$1(state.placement);
+  var isBasePlacement = !variation;
+  var mainAxis = getMainAxisFromPlacement$1(basePlacement);
+  var altAxis = getAltAxis(mainAxis);
+  var popperOffsets = state.modifiersData.popperOffsets;
+  var referenceRect = state.rects.reference;
+  var popperRect = state.rects.popper;
+  var tetherOffsetValue = typeof tetherOffset === 'function' ? tetherOffset(Object.assign(Object.assign({}, state.rects), {}, {
+    placement: state.placement
+  })) : tetherOffset;
+  var data = {
+    x: 0,
+    y: 0
+  };
+
+  if (!popperOffsets) {
+    return;
+  }
+
+  if (checkMainAxis) {
+    var mainSide = mainAxis === 'y' ? top$1 : left$1;
+    var altSide = mainAxis === 'y' ? bottom$1 : right$1;
+    var len = mainAxis === 'y' ? 'height' : 'width';
+    var offset = popperOffsets[mainAxis];
+    var min = popperOffsets[mainAxis] + overflow[mainSide];
+    var max = popperOffsets[mainAxis] - overflow[altSide];
+    var additive = tether ? -popperRect[len] / 2 : 0;
+    var minLen = variation === start$1 ? referenceRect[len] : popperRect[len];
+    var maxLen = variation === start$1 ? -popperRect[len] : -referenceRect[len]; // We need to include the arrow in the calculation so the arrow doesn't go
+    // outside the reference bounds
+
+    var arrowElement = state.elements.arrow;
+    var arrowRect = tether && arrowElement ? getLayoutRect$1(arrowElement) : {
+      width: 0,
+      height: 0
+    };
+    var arrowPaddingObject = state.modifiersData['arrow#persistent'] ? state.modifiersData['arrow#persistent'].padding : getFreshSideObject();
+    var arrowPaddingMin = arrowPaddingObject[mainSide];
+    var arrowPaddingMax = arrowPaddingObject[altSide]; // If the reference length is smaller than the arrow length, we don't want
+    // to include its full size in the calculation. If the reference is small
+    // and near the edge of a boundary, the popper can overflow even if the
+    // reference is not overflowing as well (e.g. virtual elements with no
+    // width or height)
+
+    var arrowLen = within(0, referenceRect[len], arrowRect[len]);
+    var minOffset = isBasePlacement ? referenceRect[len] / 2 - additive - arrowLen - arrowPaddingMin - tetherOffsetValue : minLen - arrowLen - arrowPaddingMin - tetherOffsetValue;
+    var maxOffset = isBasePlacement ? -referenceRect[len] / 2 + additive + arrowLen + arrowPaddingMax + tetherOffsetValue : maxLen + arrowLen + arrowPaddingMax + tetherOffsetValue;
+    var arrowOffsetParent = state.elements.arrow && getOffsetParent$1(state.elements.arrow);
+    var clientOffset = arrowOffsetParent ? mainAxis === 'y' ? arrowOffsetParent.clientTop || 0 : arrowOffsetParent.clientLeft || 0 : 0;
+    var offsetModifierValue = state.modifiersData.offset ? state.modifiersData.offset[state.placement][mainAxis] : 0;
+    var tetherMin = popperOffsets[mainAxis] + minOffset - offsetModifierValue - clientOffset;
+    var tetherMax = popperOffsets[mainAxis] + maxOffset - offsetModifierValue;
+    var preventedOffset = within(tether ? Math.min(min, tetherMin) : min, offset, tether ? Math.max(max, tetherMax) : max);
+    popperOffsets[mainAxis] = preventedOffset;
+    data[mainAxis] = preventedOffset - offset;
+  }
+
+  if (checkAltAxis) {
+    var _mainSide = mainAxis === 'x' ? top$1 : left$1;
+
+    var _altSide = mainAxis === 'x' ? bottom$1 : right$1;
+
+    var _offset = popperOffsets[altAxis];
+
+    var _min = _offset + overflow[_mainSide];
+
+    var _max = _offset - overflow[_altSide];
+
+    var _preventedOffset = within(_min, _offset, _max);
+
+    popperOffsets[altAxis] = _preventedOffset;
+    data[altAxis] = _preventedOffset - _offset;
+  }
+
+  state.modifiersData[name] = data;
+} // eslint-disable-next-line import/no-unused-modules
+
+
+var preventOverflow$1 = {
+  name: 'preventOverflow',
+  enabled: true,
+  phase: 'main',
+  fn: preventOverflow,
+  requiresIfExists: ['offset']
+};
+
+function distanceAndSkiddingToXY(placement, rects, offset) {
+  var basePlacement = getBasePlacement$1(placement);
+  var invertDistance = [left$1, top$1].indexOf(basePlacement) >= 0 ? -1 : 1;
+
+  var _ref = typeof offset === 'function' ? offset(Object.assign(Object.assign({}, rects), {}, {
+    placement: placement
+  })) : offset,
+      skidding = _ref[0],
+      distance = _ref[1];
+
+  skidding = skidding || 0;
+  distance = (distance || 0) * invertDistance;
+  return [left$1, right$1].indexOf(basePlacement) >= 0 ? {
+    x: distance,
+    y: skidding
+  } : {
+    x: skidding,
+    y: distance
+  };
+}
+
+function offset(_ref2) {
+  var state = _ref2.state,
+      options = _ref2.options,
+      name = _ref2.name;
+  var _options$offset = options.offset,
+      offset = _options$offset === void 0 ? [0, 0] : _options$offset;
+  var data = placements.reduce(function (acc, placement) {
+    acc[placement] = distanceAndSkiddingToXY(placement, state.rects, offset);
+    return acc;
+  }, {});
+  var _data$state$placement = data[state.placement],
+      x = _data$state$placement.x,
+      y = _data$state$placement.y;
+
+  if (state.modifiersData.popperOffsets != null) {
+    state.modifiersData.popperOffsets.x += x;
+    state.modifiersData.popperOffsets.y += y;
+  }
+
+  state.modifiersData[name] = data;
+} // eslint-disable-next-line import/no-unused-modules
+
+
+var offset$1 = {
+  name: 'offset',
+  enabled: true,
+  phase: 'main',
+  requires: ['popperOffsets'],
+  fn: offset
+};
+
+/**
+ * Caches form controls so they are not initialized again.
+ * Note: Declared in misc.ts so it's available in both input and validation.
+ */
+const cachedFormControls = [];
 function isNullOrWhitespace(searchTerm) {
     return searchTerm == null || (/\S/.test(searchTerm)) === false;
 }
+/*========================== Input functionality ==========================*/
 function extractRadioGroups(jQueryObject) {
     let radioFields = (jQueryObject[0] instanceof HTMLFormElement ? jQueryObject.find('input') : jQueryObject).toArray().filter(element => element.getAttribute('type') === 'radio');
     let radioGroups = radioFields.reduce((acc, curr) => {
@@ -3461,6 +4190,10 @@ function extractRadioGroups(jQueryObject) {
     }, {});
     return radioGroups;
 }
+/**
+ * Returns true if the provided object has selected only the radio elements with the same name.
+ * @param jQueryObject
+ */
 function checkIfRadioGroup(jQueryObject) {
     let selectedFormControls = Array.isArray(jQueryObject)
         ? jQueryObject
@@ -3469,32 +4202,41 @@ function checkIfRadioGroup(jQueryObject) {
         ? false
         : selectedFormControls.every(element => element.getAttribute('type') === 'radio' && element.getAttribute('name') === selectedFormControls[0].getAttribute('name'));
 }
-function isFormControlType(o) {
-    return o instanceof HTMLInputElement || o instanceof HTMLSelectElement || o instanceof HTMLAreaElement;
+/**
+ * Returns true if it's either HTMLInputElement | HTMLSelectElement | HTMLAreaElement.
+ */
+function isFormControlType(htmlElement) {
+    return htmlElement instanceof HTMLInputElement || htmlElement instanceof HTMLSelectElement || htmlElement instanceof HTMLAreaElement;
 }
+/*========================== Enums ==========================*/
+const FormControlStatusEnum = {
+    VALID: 'VALID',
+    INVALID: 'INVALID',
+    PENDING: 'PENDING',
+    DISABLED: 'DISABLED'
+};
 
-var FormControlStatus;
-(function (FormControlStatus) {
-    FormControlStatus["VALID"] = "VALID";
-    FormControlStatus["INVALID"] = "INVALID";
-    FormControlStatus["PENDING"] = "PENDING";
-    FormControlStatus["DISABLED"] = "DISABLED";
-})(FormControlStatus || (FormControlStatus = {}));
+/*========================== Public API ==========================*/
 function enableValidation(jQueryObject) {
+    // Check if it's already enabled
     if (jQueryObject.valid !== undefined)
         return;
+    // Check if it's actually a form control (maybe it's empty)
     if (jQueryObject.isFormControl !== true)
         jQueryObject.convertToFormControl();
     jQueryObject.selectedFormControls$.subscribe(selectedFormControls => selectedFormControls.filter($formControl => $formControl.valid === undefined && $formControl !== jQueryObject).forEach($formControl => enableValidation($formControl)));
+    // valid == true -> invalid = false;
     addValidInvalidGetterSetter(jQueryObject);
+    // Programatically update the validity.
     jQueryObject.manualValidityUpdateSubject = new Subject();
     if (jQueryObject.selectedFormControls.length === 1)
         setValidationRulesFromAttributes(jQueryObject);
     let statusChangesSubject = new Subject();
     jQueryObject.statusChangesSubject = statusChangesSubject;
     let sub1 = jQueryObject.selectedFormControls$.pipe(switchMap(selectedFormControls => merge(selectedFormControls.length === 0 ? NEVER : selectedFormControls.length === 1 ? jQueryObject.valueChanges : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.statusChanges)).pipe(delay(1)), jQueryObject.manualValidityUpdateSubject.asObservable())), startWith(''), tap(_ => { var _a; return jQueryObject.errors = (_a = jQueryObject.getValidators()) === null || _a === void 0 ? void 0 : _a.map(validatorFn => validatorFn(jQueryObject)).reduce((acc, curr) => curr ? Object.assign(Object.assign({}, acc), curr) : acc, null); }), map(_ => (jQueryObject.selectedFormControls.length > 1 && jQueryObject.errors) || jQueryObject.selectedFormControls.some($formControl => $formControl.errors && !$formControl.attr('disabled') && !$formControl.is('[type=hidden]'))
-        ? FormControlStatus.INVALID : FormControlStatus.VALID), tap(status => jQueryObject.valid = status === FormControlStatus.VALID)).subscribe(status => statusChangesSubject.next(status));
+        ? FormControlStatusEnum.INVALID : FormControlStatusEnum.VALID), tap(status => jQueryObject.valid = status === FormControlStatusEnum.VALID)).subscribe(status => statusChangesSubject.next(status));
     jQueryObject.statusChanges = statusChangesSubject.asObservable().pipe(share());
+    // Subscribe for status update
     jQueryObject.statusChanges.subscribe(status => jQueryObject.status = status);
     attachPopper(jQueryObject);
     jQueryObject._existingValidationSubscription = sub1;
@@ -3519,9 +4261,17 @@ function disableValidation(jQueryObject) {
     delete jQueryObject.invalid;
 }
 let registeredAttributeValidators = {};
+/**
+ * Registers validator functions to use on an control that has the specified attribute. You could use this function multiple times, but it won't have an effect on existing form controls.
+ * @param attributeValidators Object that has desired attribute names as keys, whose value are validator functions.
+ */
 function registerAttributeValidators(attributeValidators) {
     registeredAttributeValidators = Object.assign(Object.assign({}, attributeValidators), attributeValidators);
 }
+/**
+ * Attaches validity popper, which will be displayed when control is dirty and invalid, auto-flip when needed, auto-update whenever reference changes visibility.
+ * @param jQueryObject Form control / group the popper attaches to.
+ */
 function attachPopper(jQueryObject) {
     let $popper = $(`
         <span class="popper validation" role="tooltip">
@@ -3529,34 +4279,51 @@ function attachPopper(jQueryObject) {
             <span class="popper__arrow" data-popper-arrow></span>
         </span>
         `);
-    jQueryObject.validityPopper = createPopper($('body')[0], $popper[0], { modifiers: [{ preventOverflow: { boundariesElement: $(document.body) } }] });
+    // Config: overflows document -> flips to top. Left and right poppers have 5px offset.
+    jQueryObject.validityPopper = createPopper($('body')[0], $popper[0], { modifiers: [
+            Object.assign(Object.assign({}, preventOverflow$1), { options: { rootBoundary: 'document' } }),
+            Object.assign(Object.assign({}, flip$1), { options: { fallbackPlacements: ['top'], rootBoundary: 'document' } }),
+            Object.assign(Object.assign({}, offset$1), { options: { offset: arg0 => ['left', 'right'].includes(arg0.placement) ? [0, 5] : [0, 0] } })
+        ] });
+    // Catch manual setting of placement
+    let isPlacementManual = false;
+    let originalSetOptions = jQueryObject.validityPopper.setOptions;
+    jQueryObject.validityPopper.setOptions = function (options) {
+        if (options.placement)
+            isPlacementManual = true;
+        return originalSetOptions(options);
+    };
     let observer;
-    jQueryObject.selectedFormControls$.pipe(filter(selectedFormControls => selectedFormControls.length > 0), map(_ => determinePlacement(jQueryObject))).subscribe(({ $reference }) => {
-        $reference.append($popper);
+    // Control the placement and handle DOM visibility
+    jQueryObject.selectedFormControls$.pipe(filter(selectedFormControls => selectedFormControls.length > 0), map(_ => determinePopperPositioning(jQueryObject))).subscribe(({ $reference }) => {
+        $reference.addClass('popper-reference').append($popper);
         jQueryObject.validityPopper.state.elements.reference = $reference[0];
         jQueryObject.validityPopper.update();
         observer && observer.disconnect();
-        observer = new IntersectionObserver((entries, _) => entries[0].intersectionRatio > 0 && updatePopperPlacement(jQueryObject));
+        if (isPlacementManual)
+            return;
+        observer = new IntersectionObserver((entries, _) => entries[0].intersectionRatio === 1 && updatePopperPlacement(jQueryObject) || $popper.css('visibility', 'hidden'), // updatePopperPlacement knows about visibility
+        { root: $reference.parent()[0], threshold: [0.5, 1] });
         observer.observe($reference[0]);
     }, null, () => observer.disconnect());
-    let dirtyObservable$ = jQueryObject.selectedFormControls$.pipe(switchMap(_ => checkIfRadioGroup(jQueryObject)
-        ? jQueryObject.dirtySubject.asObservable()
-        : combineLatest(jQueryObject.selectedFormControls.map(formControl => formControl.dirtySubject.asObservable())).pipe(map(dirtyStatuses => dirtyStatuses.every(status => status === true)), distinctUntilChanged())));
+    // Handle hiding / showing of the popper
+    let dirtyObservable$ = jQueryObject.dirtySubject.asObservable().pipe(filter(_ => jQueryObject.selectedFormControls.every($c => $c.dirty)), distinctUntilChanged());
     let popperShownSubject = new BehaviorSubject(false);
     jQueryObject.isValidityMessageShown$ = popperShownSubject.asObservable().pipe(distinctUntilChanged());
     let wasValidityMessageShown = false;
     jQueryObject.isValidityMessageShown$.pipe(filter(isShown => isShown === true), take(1)).subscribe(_ => wasValidityMessageShown = true);
-    merge(jQueryObject.statusChanges, dirtyObservable$).pipe(switchMap(_ => jQueryObject.is(':focus') && wasValidityMessageShown !== true
+    merge(jQueryObject.statusChanges, dirtyObservable$).pipe(switchMap(_ => jQueryObject.is(':focus') && wasValidityMessageShown === false
         ? fromEvent(jQueryObject, 'blur')
         : of(null)))
         .subscribe(_ => {
         let $popper = $(jQueryObject.validityPopper.state.elements.popper);
         let enabled = !jQueryObject.attr('disabled');
         let validationErrors = window['validationErrors'];
+        // Show if dirty and invalid (with personal errors) or hide otherwise
         if (jQueryObject.dirty && jQueryObject.invalid && jQueryObject.errors) {
-            if (jQueryObject.selectedFormControls.length > 1 && !checkIfRadioGroup(jQueryObject) && jQueryObject.selectedFormControls.some(formControl => formControl.pristine)) {
+            // Form groups, by default, show their errors once all of their descendants become dirty
+            if (jQueryObject.selectedFormControls.length > 1 && jQueryObject.selectedFormControls.some(formControl => formControl.pristine))
                 return;
-            }
             let errorMessage = Object.keys(jQueryObject.errors).map(key => typeof jQueryObject.errors[key] === 'string' ? jQueryObject.errors[key] : validationErrors[key]).join('\n');
             $popper.find('.field-validation').addClass('field-validation-error').html(errorMessage);
             if (enabled) {
@@ -3579,6 +4346,11 @@ function attachPopper(jQueryObject) {
 function hasError(jQueryObject, errorCode) {
     return Object.keys(jQueryObject.errors).some(key => key === errorCode);
 }
+/*========================== Private Part ==========================*/
+/**
+ * Adds validator functions to the control based on its properties. Works with radios.
+ * @param $formControl
+ */
 function setValidationRulesFromAttributes($formControl) {
     let validators = [];
     for (let attribute in registeredAttributeValidators)
@@ -3587,6 +4359,9 @@ function setValidationRulesFromAttributes($formControl) {
     if (validators.length > 0)
         $formControl.setValidators(validators);
 }
+/**
+ * Adds corresponding getter and setter for the valid and invalid properties.
+ */
 function addValidInvalidGetterSetter(jQueryObject) {
     Object.defineProperty(jQueryObject, 'valid', {
         get() {
@@ -3607,48 +4382,60 @@ function addValidInvalidGetterSetter(jQueryObject) {
         }
     });
 }
-function determinePlacement(jQueryObject) {
-    let predefinedPlacement = jQueryObject.attr('data-val-pop');
-    let singleElementFn = (formControl) => {
-        let $reference;
-        let placement;
-        if (formControl.parent('.input-group').length) {
-            $reference = formControl.parent();
-            let referenceRect = $reference[0].getBoundingClientRect();
-            let inputGroups = $('.input-group:visible').toArray().map(e => $(e));
-            let areAnyToTheLeft = inputGroups.some(inputGroup => {
-                let inputGroupRect = inputGroup[0].getBoundingClientRect();
-                return Math.abs(inputGroupRect.top - referenceRect.top) < referenceRect.height
-                    && referenceRect.left > inputGroupRect.right
-                    && referenceRect.left < inputGroupRect.right + 300;
-            });
-            placement = areAnyToTheLeft
-                ? 'right'
-                : 'left';
-        }
-        else {
-            $reference = formControl.parent();
-            placement = 'right-start';
-        }
-        return { $reference, placement: predefinedPlacement !== null && predefinedPlacement !== void 0 ? predefinedPlacement : placement };
-    };
-    if (jQueryObject.selectedFormControls.length === 1)
-        return singleElementFn(jQueryObject);
-    else {
-        let $reference;
-        let placement;
-        let results = jQueryObject.selectedFormControls.filter(e => e.is(':not([type=hidden])')).map(e => singleElementFn($(e)));
-        if (results.every(result => result.$reference === results[0].$reference))
-            $reference = results[0].$reference;
-        else
-            $reference = getCommonAncestor(...results.map(result => result.$reference));
-        if (results.every(result => result.placement === results[0].placement))
-            placement = results[0].placement;
-        else
-            placement = 'right-start';
-        return { $reference, placement };
+/**
+ * Returns reference and placement (left / right) of the popper.
+ * @param jQueryObject
+ */
+function determinePopperPositioning(jQueryObject) {
+    let $predefinedReference = jQueryObject.attr('popper-reference') ? jQueryObject.closest(jQueryObject.attr('popper-reference')) : null;
+    if ($predefinedReference)
+        return { $reference: $predefinedReference, placement: determinePlacement(jQueryObject, $predefinedReference[0]) };
+    function determinePlacement(jQueryObject, reference) {
+        let predefinedPlacement = jQueryObject.attr('popper-placement');
+        if (predefinedPlacement)
+            return predefinedPlacement;
+        if (jQueryObject.selectedFormControls.length === 1)
+            return hasInputsOnLeft(jQueryObject.selectedFormControls[0], reference) ? 'right' : 'left';
+        return 'left';
     }
+    /**
+     * Checks if any input is to the left of the current input so the popper would then go 'right', instead of default 'left'.
+     */
+    function hasInputsOnLeft($formControl, reference) {
+        let referenceRect = reference.getBoundingClientRect();
+        // Form controls that come before current one in DOM.
+        let previousFormControlElements = cachedFormControls.slice(0, cachedFormControls.indexOf($formControl))
+            .flatMap($e => $e.toArray())
+            .filter(element => isFormControlType(element));
+        return previousFormControlElements.some(previousControl => {
+            let previousControlRect = previousControl.getBoundingClientRect();
+            return Math.abs(previousControlRect.top - referenceRect.top) < referenceRect.height
+                && referenceRect.left > previousControlRect.right
+                && referenceRect.left < previousControlRect.right + 300;
+        });
+    }
+    // Reference is not predefined, let's find it.
+    let $reference;
+    if (jQueryObject.selectedFormControls.length === 1 && checkIfRadioGroup(jQueryObject) === false) {
+        let formControl = jQueryObject.selectedFormControls[0][0];
+        $reference = $(formControl.parentElement);
+    }
+    else {
+        let references = jQueryObject.selectedFormControls.flatMap($formControl => $formControl.toArray()) // flatMap handles multiple element such as radios
+            .filter(e => e.getAttribute('type') !== 'hidden') // ignore 'hidden' inputs
+            .map(e => $(e.parentElement)); // references are parents.
+        // Find the common ancestor of all the references
+        if (references.every($reference => $reference === references[0]))
+            $reference = references[0];
+        else
+            $reference = getCommonAncestor(...references);
+    }
+    return { $reference, placement: determinePlacement(jQueryObject, $reference[0]) };
 }
+/**
+ * Find the element that is a common ancestor of all the proveded objects.
+ * Used to find the popper reference of form groups (or radio control).
+ */
 function getCommonAncestor(...objects) {
     let $parentsA = objects[0].parents();
     let $parentsB = objects.length == 2 ? objects[1].parents() : $(getCommonAncestor(...objects.slice(1))).children(':eq(0)').parents();
@@ -3669,11 +4456,13 @@ function getCommonAncestor(...objects) {
 function updatePopperPlacement(jQueryObject) {
     return __awaiter(this, void 0, void 0, function* () {
         let $popper = $(jQueryObject.validityPopper.state.elements.popper);
-        let isPopperVisible = $popper.is(':visible');
-        !isPopperVisible && $popper.css('visibility', 'hidden').show();
-        jQueryObject.validityPopper.setOptions(Object.assign(Object.assign({}, jQueryObject.validityPopper.state), { placement: determinePlacement(jQueryObject).placement }));
-        yield timer(10).toPromise();
-        !isPopperVisible && $popper.css('visibility', 'visible').hide();
+        // Make sure the popper takes up space in DOM
+        jQueryObject.isValidityMessageShown$.pipe(take(1)).subscribe(isShown => !isShown && $popper.css('visibility', 'hidden').show());
+        // Update position
+        yield jQueryObject.validityPopper.setOptions({ placement: determinePopperPositioning(jQueryObject).placement });
+        // Hide if it's supposed to be hidden
+        jQueryObject.isValidityMessageShown$.pipe(tap(_ => $popper.css('visibility', 'visible')), take(1))
+            .subscribe(isShown => !isShown && $popper.hide());
     });
 }
 
@@ -3685,11 +4474,14 @@ function extendFormElements() {
             if (value_function === undefined && this.isFormControl)
                 return getFormControlValue(this);
             let result = baseValFn.apply(this, arguments);
+            // Emit new valueChanges value.
             if (!(value_function instanceof Function) && value_function !== undefined && $(this).valueChangesSubject)
                 this.each(_ => $(this).valueChangesSubject.next(value_function));
             return result;
         },
         attr: function (attributeName, value_function) {
+            // Extend "disabled" attribute to affect autocomplete display fields,
+            // and to trigger validation
             if (attributeName === 'disabled' && value_function !== undefined && isFormControlType(this[0])) {
                 this.each(function () {
                     let name = $(this).attr('name');
@@ -3702,7 +4494,7 @@ function extendFormElements() {
                         return;
                     setTimeout(() => {
                         if (value_function === true)
-                            $(this).statusChangesSubject && $(this).statusChangesSubject.next(FormControlStatus.DISABLED);
+                            $(this).statusChangesSubject && $(this).statusChangesSubject.next(FormControlStatusEnum.DISABLED);
                         else
                             $(this).updateValidity();
                     });
@@ -3774,6 +4566,7 @@ function extendFormElements() {
         reset() {
             this.markAsUntouched();
             this.markAsPristine();
+            // TODO: handle if there's more than one form
             if (this[0] instanceof HTMLFormElement) {
                 this[0].reset();
                 return;
@@ -3797,16 +4590,23 @@ function extendFormElements() {
         }
     });
     let originalInit = jQuery.fn.init;
+    /**
+     * Form control is the extended jQuery object of a single input element.
+     */
     let formControl = function (jQueryObject) {
         originalInit.call(this, jQueryObject);
         this.isFormControl = true;
     };
+    /**
+     * Form group is the extended jQuery object of multiple input elements, or a form.
+     */
     let formGroup = function (jQueryObject) {
         originalInit.call(this, jQueryObject);
         this.isFormControl = true;
     };
     formControl.prototype = new originalInit();
     formGroup.prototype = new originalInit();
+    // Constructor
     jQuery.fn.init = function () {
         let jQueryObject = new originalInit(arguments[0], arguments[1]);
         if (areFormControlsSelected(jQueryObject) === false)
@@ -3817,13 +4617,15 @@ function extendFormElements() {
         return jQueryObject.toArray().some(singleJQueryObject => isFormControlType(singleJQueryObject) || singleJQueryObject instanceof HTMLFormElement);
     }
     function isGroupSelected(jQueryObject) {
-        return jQueryObject.toArray().filter(singleJQueryObject => isFormControlType(singleJQueryObject)).length > 1 || jQueryObject[0] instanceof HTMLFormElement;
+        return jQueryObject.toArray().filter(singleJQueryObject => isFormControlType(singleJQueryObject)).length > 1 && !checkIfRadioGroup(jQueryObject) || jQueryObject[0] instanceof HTMLFormElement;
     }
 }
 function convertToFormControl(jQueryObject) {
+    // See if it's cached
     let cachedElement = findCachedElement(jQueryObject);
     if (cachedElement)
         return cachedElement;
+    // Add getter and setter for the 'selectedFormControls' property. Any updates to this value can now be observed.
     Object.defineProperty(jQueryObject, 'selectedFormControls', {
         get() {
             return this._selectedFormControls;
@@ -3846,8 +4648,10 @@ function convertToFormControl(jQueryObject) {
         jQueryObject.selectedFormControls = [jQueryObject];
     else
         jQueryObject.selectedFormControls = [];
+    // Check new selected elements if they are indeed form control
     jQueryObject.selectedFormControls$.pipe(skip(1)).subscribe(selectedFormControls => selectedFormControls.filter($formControl => !$formControl.isFormControl).forEach($formControl => convertToFormControl($formControl)));
     addFormControlProperties(jQueryObject);
+    // Cache it
     addToCache(jQueryObject);
     return jQueryObject;
 }
@@ -3858,15 +4662,19 @@ function addFormControlProperties(jQueryObject) {
     jQueryObject.selectedFormControls$
         .pipe(switchMap(selectedFormControls => selectedFormControls.length === 1
         ? fromEvent(jQueryObject, 'input')
-        : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.valueChanges)).pipe(delay(1))))
+        : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.valueChanges)).pipe(delay(1))
+    // Note: delay makes sure value change of an individual control would trigger subscription handlers before group one's would. (RxJS is synchronous by default)
+    ))
         .subscribe(_ => valueChangesSubject.next(null));
     jQueryObject.valueChanges = valueChangesSubject.asObservable().pipe(map(_ => getFormControlValue(jQueryObject)), distinctUntilChanged(), share());
+    // Dirty state
     jQueryObject.dirtySubject = new Subject();
     jQueryObject.markAsPristine();
     jQueryObject.selectedFormControls$
         .pipe(switchMap(selectedFormControls => selectedFormControls.length === 1
         ? fromEvent(jQueryObject, 'input')
         : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.dirtySubject.asObservable())).pipe(filter(isDirty => isDirty), delay(1)))).subscribe(_ => jQueryObject.markAsDirty());
+    // Touched state
     jQueryObject.touchedSubject = new Subject();
     jQueryObject.markAsUntouched();
     jQueryObject.selectedFormControls$
@@ -3874,19 +4682,27 @@ function addFormControlProperties(jQueryObject) {
         ? fromEvent(jQueryObject, 'focus')
         : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.touchedSubject.asObservable())).pipe(filter(isTouched => isTouched), delay(1)))).subscribe(_ => jQueryObject.markAsTouched());
 }
+/**
+ * If checked, returns input's value, otherwise returns hidden namesake's value.
+ */
 function getCheckboxValue(jQueryObject) {
     let selectedFormControls = Array.isArray(jQueryObject) ? jQueryObject.map(e => e[0]) : jQueryObject.toArray();
     let isChecked = selectedFormControls.some(element => element.checked);
     if (isChecked)
-        return selectedFormControls.find(element => element.checked).value;
+        return selectedFormControls.find(element => element.checked).value; //val() would cause a loop
     else {
         let hiddenNamesake = selectedFormControls.find(element => element.getAttribute('type') == 'hidden');
         return hiddenNamesake ? hiddenNamesake.value.toString() : null;
     }
 }
+/*========================== Private Part ==========================*/
+/**
+ * Gets the value of the form control as string, if it's a single element, or as key value pair of field names and their values, if it's not a single element.
+ */
 function getFormControlValue(jQueryObject) {
     let selectedFormControls = jQueryObject.selectedFormControls;
     let result = {};
+    // Handle checkboxes and radios 
     let namesakes = selectedFormControls.reduce((acc, curr) => {
         let name = curr.attr('name');
         acc[name] ? acc[name].push(curr) : (acc[name] = [curr]);
@@ -3897,25 +4713,41 @@ function getFormControlValue(jQueryObject) {
         let areCheckboxes = formControls[0].attr('type') === 'checkbox';
         let areRadios = formControls[0].attr('type') === 'radio';
         result[name] = !areCheckboxes && !areRadios
-            ? formControls[formControls.length - 1][0].value
+            ? formControls[formControls.length - 1][0].value // normal input
             : areCheckboxes
-                ? getCheckboxValue(formControls)
-                : formControls[0].filter(':checked')[0].value;
+                ? getCheckboxValue(formControls) // checkbox
+                : formControls[0].filter(':checked')[0].value; // radio
     }
+    // If only one namesake set is selected return its value (TODO: check what was this condition below)
+    // if (Object.keys(namesakes).length === 1 && selectedFormControls.length === Object.values(namesakes).map((elements: []) => elements.length).reduce((acc, curr) => acc + curr, 0)) {
     if (Object.keys(namesakes).length === 1)
         return Object.values(result)[0];
     return result;
 }
-const cachedFormControls = [];
+/**
+ * Finds the cached version of the form control and returns it, otherwise returns null.
+ *
+ * Elements are compared based on the results of the original query, and not on assigned selectedFormControls.
+ * @param jQueryObject
+ */
 function findCachedElement(jQueryObject) {
     var _a;
     return (_a = cachedFormControls
         .find($cachedFormControl => $cachedFormControl.length === jQueryObject.length && $cachedFormControl.toArray().every(element => jQueryObject.toArray().includes(element)))) !== null && _a !== void 0 ? _a : null;
 }
+/**
+ * Adds the provided form control to the cache.
+ * @see findCachedElement()
+ */
 function addToCache(jQueryObject) {
     cachedFormControls.push(jQueryObject);
 }
+/**
+ * Adds properties for touched - untouched, dirty - pristine.
+ * @param jQueryObject
+ */
 function addComplementaryGettersSetters(jQueryObject) {
+    // touched
     Object.defineProperty(jQueryObject, 'touched', {
         get() {
             return this._touched;
@@ -3925,6 +4757,7 @@ function addComplementaryGettersSetters(jQueryObject) {
             this._untouched = !value;
         }
     });
+    // untouched
     Object.defineProperty(jQueryObject, 'untouched', {
         get() {
             return this._untouched;
@@ -3934,6 +4767,7 @@ function addComplementaryGettersSetters(jQueryObject) {
             this._touched = !value;
         }
     });
+    // dirty
     Object.defineProperty(jQueryObject, 'dirty', {
         get() {
             return this._dirty;
@@ -3943,6 +4777,7 @@ function addComplementaryGettersSetters(jQueryObject) {
             this._pristine = !value;
         }
     });
+    // pristine
     Object.defineProperty(jQueryObject, 'pristine', {
         get() {
             return this._pristine;
@@ -3957,7 +4792,6 @@ function addComplementaryGettersSetters(jQueryObject) {
 /**
  * @suppress {checkTypes,constantProperty,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
  */
-
 /**
  * A regular expression that matches valid e-mail addresses.
  *
@@ -4025,11 +4859,10 @@ class Validators {
      *
      */
     static min(min) {
-        return (/**
+        return ( /**
          * @param {?} $control
          * @return {?}
-         */
-        ($control) => {
+         */($control) => {
             if (isNullOrWhitespace($control.val()) || isNullOrWhitespace(min)) {
                 return null; // don't validate empty values to allow optional controls
             }
@@ -4063,11 +4896,10 @@ class Validators {
      *
      */
     static max(max) {
-        return (/**
+        return ( /**
          * @param {?} $control
          * @return {?}
-         */
-        ($control) => {
+         */($control) => {
             if (isNullOrWhitespace($control.val()) || isNullOrWhitespace(max)) {
                 return null; // don't validate empty values to allow optional controls
             }
@@ -4197,11 +5029,10 @@ class Validators {
      *
      */
     static minLength(minLength) {
-        return (/**
+        return ( /**
          * @param {?} $control
          * @return {?}
-         */
-        ($control) => {
+         */($control) => {
             if (isNullOrWhitespace($control.val())) {
                 return null; // don't validate empty values to allow optional controls
             }
@@ -4240,11 +5071,10 @@ class Validators {
      *
      */
     static maxLength(maxLength) {
-        return (/**
+        return ( /**
          * @param {?} $control
          * @return {?}
-         */
-        ($control) => {
+         */($control) => {
             /** @type {?} */
             const length = $control.val() ? $control.val().length : 0;
             return length > maxLength ?
@@ -4302,11 +5132,10 @@ class Validators {
             regexStr = pattern.toString();
             regex = pattern;
         }
-        return (/**
+        return ( /**
          * @param {?} $control
          * @return {?}
-         */
-        ($control) => {
+         */($control) => {
             if (isNullOrWhitespace($control.val())) {
                 return null; // don't validate empty values to allow optional controls
             }
@@ -4334,14 +5163,13 @@ class Validators {
         if (!validators)
             return null;
         /** @type {?} */
-        const presentValidators = (/** @type {?} */ (validators.filter(isPresent)));
+        const presentValidators = ( /** @type {?} */(validators.filter(isPresent)));
         if (presentValidators.length == 0)
             return null;
-        return (/**
+        return ( /**
          * @param {?} control
          * @return {?}
-         */
-        function (control) {
+         */function (control) {
             return _mergeErrors(_executeValidators(control, presentValidators));
         });
     }
@@ -4359,11 +5187,13 @@ function isPresent(o) {
  * @return {?}
  */
 function _executeValidators(control, validators) {
-    return validators.map((/**
+    return validators.map(( /**
      * @param {?} v
      * @return {?}
-     */
-    v => v(control)));
+     *//**
+     * @param {?} v
+     * @return {?}
+     */ v => v(control)));
 }
 /**
  * @param {?} arrayOfErrors
@@ -4371,18 +5201,17 @@ function _executeValidators(control, validators) {
  */
 function _mergeErrors(arrayOfErrors) {
     /** @type {?} */
-    const res = arrayOfErrors.reduce((/**
+    const res = arrayOfErrors.reduce(( /**
      * @param {?} res
      * @param {?} errors
      * @return {?}
-     */
-    (res, errors) => {
-        return errors != null ? Object.assign({}, (/** @type {?} */ (res)), errors) : (/** @type {?} */ (res));
+     */(res, errors) => {
+        return errors != null ? Object.assign({}, ( /** @type {?} */(res)), errors) : ( /** @type {?} */(res));
     }), {});
     return Object.keys(res).length === 0 ? null : res;
 }
 
 extendFormElements();
 
-export { FormControlStatus, Validators, checkIfRadioGroup, convertToFormControl, extractRadioGroups, getCheckboxValue, isFormControlType, isNullOrWhitespace, registerAttributeValidators };
+export { FormControlStatusEnum as FormControlStatus, Validators, cachedFormControls, checkIfRadioGroup, convertToFormControl, extractRadioGroups, getCheckboxValue, isFormControlType, isNullOrWhitespace, registerAttributeValidators };
 //# sourceMappingURL=index.js.map

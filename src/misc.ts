@@ -1,3 +1,10 @@
+import {JQueryInternal} from "../@types/input";
+
+/**
+ * Caches form controls so they are not initialized again.
+ * Note: Declared in misc.ts so it's available in both input and validation.
+ */
+export const cachedFormControls: JQueryInternal.JQueryInternal<FormControlType | HTMLFormElement>[] = [];
 
 export function isNullOrWhitespace(searchTerm: string): boolean {
     return searchTerm == null || (/\S/.test(searchTerm)) === false;
@@ -33,6 +40,20 @@ export function checkIfRadioGroup(jQueryObject: JQuery<any> | FormControlType[])
         : selectedFormControls.every(element => element.getAttribute('type') === 'radio' && element.getAttribute('name') === selectedFormControls[0].getAttribute('name'));
 }
 
-export function isFormControlType(o: HTMLElement): boolean {
-    return o instanceof HTMLInputElement || o instanceof HTMLSelectElement || o instanceof HTMLAreaElement;
+/**
+ * Returns true if it's either HTMLInputElement | HTMLSelectElement | HTMLAreaElement.
+ */
+export function isFormControlType(htmlElement: HTMLElement): boolean {
+    return htmlElement instanceof HTMLInputElement || htmlElement instanceof HTMLSelectElement || htmlElement instanceof HTMLAreaElement;
 }
+
+
+/*========================== Enums ==========================*/
+
+const FormControlStatusEnum: {[index in FormControlStatus]: FormControlStatus} = {
+    VALID: 'VALID' as FormControlStatus,
+    INVALID: 'INVALID' as FormControlStatus,
+    PENDING: 'PENDING' as FormControlStatus,
+    DISABLED: 'DISABLED' as FormControlStatus
+};
+export {FormControlStatusEnum as FormControlStatus};
