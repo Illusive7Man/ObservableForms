@@ -1,18 +1,6 @@
 # Project exclude paths
 /node_modules/
-/src/js/index.d.ts
-/src/js/index.js
-/src/js/index.js.map
-/src/js/input.d.ts
-/src/js/input.js
-/src/js/input.js.map
-/src/js/misc.d.ts
-/src/js/misc.js
-/src/js/misc.js.map
-/src/js/validation.d.ts
-/src/js/validation.js
-/src/js/validation.js.map
+/lib
 
-package-lock.json
 .idea
 observable-forms-**.tgz

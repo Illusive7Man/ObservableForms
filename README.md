@@ -11,7 +11,7 @@ Properties such as
 - setValidators
 
 and many more, are added to the jQuery object: `let $formControl = $('#some-input')`.<br />
-List of properties can be found in the [type file](src/js/@types/input.d.ts).
+List of properties can be found in the [type file](@types/input.d.ts).
 <br/><br/>
 
 Controlling form's behavior and validation in Angular is such a straightforward task that I had to implement some of the workflow in jQuery.<br/>

@@ -7,7 +7,7 @@
   "bugs": {
     "url": "https://github.com/Illusive7Man/ObservableForms/issues"
   },
-  "name": "observable-forms",
+  "files": ["css/*", "@types/*", "dist/*", "lib/*"],
   "dependencies": {
     "@popperjs/core": "^2.5.3",
     "rxjs": "^6.6.3"
@@ -32,7 +32,8 @@
     "reactive"
   ],
   "license": "Apache-2.0",
-  "main": "src/js/index.ts",
+  "main": "lib/index.js",
+  "name": "observable-forms",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Illusive7Man/ObservableForms.git"

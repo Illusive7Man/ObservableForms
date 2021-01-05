@@ -3,26 +3,23 @@
     "lib": [ "es5", "es6", "ES2020", "dom", "dom.iterable" ],
     "noImplicitAny": false,
     "noEmitOnError": true,
-    "removeComments": true,
-    "sourceMap": true,
-    "declaration": false,
     "downlevelIteration": true,
-    "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "importHelpers": true,
 
+    "target": "ES6",
     "module": "ES6",
     "moduleResolution": "node",
-    "target": "ES6",
-    "esModuleInterop": false
+    "declaration": true,
+    "outDir": "lib"
   },
   "compileOnSave": true,
   "include": [
-    "./*",
-    "src/js/*"
+    "src"
   ],
   "exclude": [
     "dist",
-    "node_modules"
+    "node_modules",
+    "lib"
   ]
 }

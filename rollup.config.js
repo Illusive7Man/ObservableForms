@@ -2,7 +2,7 @@ import nodeResolve from "@rollup/plugin-node-resolve";
 import sourcemaps from "rollup-plugin-sourcemaps";
 
 export default [{
-    input: 'src/js/index.js',
+    input: 'lib/index.js',
     output: {
         file: 'dist/index.js',
         format: 'esm',
