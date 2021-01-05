@@ -7,7 +7,12 @@
   "bugs": {
     "url": "https://github.com/Illusive7Man/ObservableForms/issues"
   },
-  "files": ["css/*", "@types/*", "dist/*", "lib/*"],
+  "files": [
+    "css/*",
+    "@types/*",
+    "dist/*",
+    "lib/*"
+  ],
   "dependencies": {
     "@popperjs/core": "^2.5.3",
     "rxjs": "^6.6.3"
@@ -45,5 +50,5 @@
     "bundle:esm:min": "terser --ecma 6 --compress --mangle --module -o dist/index.min.js -- dist/index.js"
   },
   "type": "module",
-  "version": "0.8.2"
+  "version": "0.8.3"
 }
