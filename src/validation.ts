@@ -1,4 +1,4 @@
-﻿import {delay, distinctUntilChanged, filter, map, share, shareReplay, startWith, switchMap, take, tap} from "rxjs/operators";
+﻿import {debounceTime, delay, distinctUntilChanged, filter, map, share, shareReplay, skip, startWith, switchMap, take, takeWhile, tap} from "rxjs/operators";
 import {createPopperLite as createPopper, Modifier, Placement} from "@popperjs/core/dist/esm";
 import flip from '@popperjs/core/lib/modifiers/flip.js';
 import preventOverflow from '@popperjs/core/lib/modifiers/preventOverflow.js';
@@ -8,6 +8,8 @@ import {BehaviorSubject, fromEvent, merge, NEVER, of, Subject} from "rxjs";
 import {cachedFormControls, checkIfRadioGroup, isFormControlType, FormControlStatus} from "./misc";
 import JQuery = JQueryInternal.JQueryInternal;
 import {JQueryInternal} from "../@types/input";
+import {fromFullVisibility} from "./ observable/fromFullVisibility";
+import {fromResize} from "./ observable/fromResize";
 
 /*========================== Public API ==========================*/
 
@@ -119,34 +121,42 @@ export function attachPopper(jQueryObject: JQuery<FormControlType | HTMLFormElem
 
 
     // Catch manual setting of placement
-    let isPlacementManual = false;
+    let isPlacedManually = false;
     let originalSetOptions = jQueryObject.validityPopper.setOptions;
-    jQueryObject.validityPopper.setOptions = function (options) {
-        if (options.placement)
-            isPlacementManual = true;
+    jQueryObject.validityPopper.setOptions = function (options, isInternal = false) {
+        if (!isInternal && options.placement)
+            isPlacedManually = true;
         return originalSetOptions(options);
     }
 
-    let observer: IntersectionObserver;
 
     // Control the placement and handle DOM visibility
-    jQueryObject.selectedFormControls$.pipe(filter(selectedFormControls => selectedFormControls.length > 0), map(_ => determinePopperPositioning(jQueryObject))).subscribe(({$reference}) => {
+    let reference$ = jQueryObject.selectedFormControls$.pipe(
+        filter(selectedFormControls => selectedFormControls.length > 0),
+        map(_ => determinePopperPositioning(jQueryObject).$reference), shareReplay(1));
+
+    // Setup reference element
+    reference$.subscribe($reference => {
         $reference.addClass('popper-reference').append($popper);
         jQueryObject.validityPopper.state.elements.reference = $reference[0];
         jQueryObject.validityPopper.update();
+    })
 
-        observer && observer.disconnect();
-        if (isPlacementManual)
-            return;
-        observer = new IntersectionObserver((entries, _) =>
-            entries[0].intersectionRatio === 1 && updatePopperPlacement(jQueryObject) || $popper.css('visibility', 'hidden'), // updatePopperPlacement knows about visibility
-            {root: $reference.parent()[0], threshold: [0.5, 1]});
-        observer.observe($reference[0]);
-    }, null, () => observer.disconnect());
+    // Visibility - position/placement update
+    reference$.pipe(takeWhile(_ => !isPlacedManually), switchMap($reference => fromFullVisibility($reference[0])), takeWhile(_ => !isPlacedManually))
+        .subscribe(isFullyVisible => isFullyVisible ? updatePopperPlacement(jQueryObject) : $popper.css('visibility', 'hidden')); // updatePopperPlacement knows about visibility
+
+    // Resize - position tracking
+    let isFresh = true, isTransition = false;
+    reference$.pipe(
+        switchMap($reference => fromResize($reference[0])),                                                     // Observe reference's resize
+        tap(_ => isFresh ? (isFresh = false) || jQueryObject.validityPopper.forceUpdate() : isTransition = true), // Do the first one
+        debounceTime(34),                                                                                      // If triggered more than once, debounce 100ms
+        tap(_ => isTransition && jQueryObject.validityPopper.forceUpdate())                                       // and do it one final time
+    ).subscribe(_ => (isFresh = true) && (isTransition = false));
 
 
-
-    // Handle hiding / showing of the popper
+    // Handle display of errors
     let dirtyObservable$ = jQueryObject.dirtySubject.asObservable().pipe(filter(_ => jQueryObject.selectedFormControls.every($c => $c.dirty)), distinctUntilChanged());
 
     let popperShownSubject = new BehaviorSubject<boolean>(false);
@@ -312,27 +322,25 @@ function determinePopperPositioning(jQueryObject: JQuery<FormControlType | HTMLF
  * Used to find the popper reference of form groups (or radio control).
  */
 function getCommonAncestor(...objects): JQuery<HTMLElement> {
-    let $parentsA = objects[0].parents();
-    let $parentsB = objects.length == 2 ? objects[1].parents() : $(getCommonAncestor(...objects.slice(1))).children(':eq(0)').parents();
+    let parentsA = getParents(objects[0]);
+    let parentsB = objects.length == 2 ? getParents(objects[1]) : getParents(getCommonAncestor(...objects.slice(1)).children(':eq(0)'));
 
-    let found = null;
+    let commonAncestor = parentsA.find(parentA => parentsB.includes(parentA));
 
-    $parentsA.each(function() {
-        let thisA = this;
+    return $(commonAncestor) as any;
+}
 
-        $parentsB.each(function() {
-            if (thisA == this)
-            {
-                found = this;
-                return false;
-            }
-        });
+function getParents($element: JQuery<HTMLElement>): HTMLElement[] {
+    let isInsideShadowRoot = $element[0].getRootNode() instanceof ShadowRoot;
 
-        if (found)
-            return false;
-    });
+    let parents = $element.parents().toArray();
 
-    return $(found) as JQuery<HTMLElement>
+    if (isInsideShadowRoot) {
+        let $hostElement = $(($element[0].getRootNode() as ShadowRoot).host);
+        parents = [...parents, $hostElement[0] as HTMLElement, ...$hostElement.parents()];
+    }
+
+    return parents;
 }
 
 async function updatePopperPlacement(jQueryObject: JQuery<FormControlType | HTMLFormElement>): Promise<void> {
@@ -342,7 +350,8 @@ async function updatePopperPlacement(jQueryObject: JQuery<FormControlType | HTML
     jQueryObject.isValidityMessageShown$.pipe(take(1)).subscribe(isShown => !isShown && $popper.css('visibility', 'hidden').show());
 
     // Update position
-    await jQueryObject.validityPopper.setOptions({placement: determinePopperPositioning(jQueryObject).placement});
+    // @ts-ignore
+    await jQueryObject.validityPopper.setOptions({placement: determinePopperPositioning(jQueryObject).placement}, true);
 
     // Hide if it's supposed to be hidden
     jQueryObject.isValidityMessageShown$.pipe(tap(_ => $popper.css('visibility', 'visible')), take(1))
