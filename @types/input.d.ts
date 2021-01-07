@@ -23,12 +23,23 @@ declare global {
     abstract class JQuery<TElement = HTMLElement> implements JQueryOriginal<FormControlType> {
 
         /**
-         * Manually converts the jquery object to a form control.
-         * Used when selecting objects using methods and not the constructor (children, find...),
-         * or when the constructor hasn't returned any results.
-         *
+         * Converts a jQuery object to either form control or form group, depending on whether one or multiple input elements is selected.
+         * Form control, or form groups' descendants which are form controls, are added to the {@link JQuery.selectedFormControls} array,
+         * and each have been attached with the properties for:
+         *  - observing values, {@link JQuery.valueChanges}
+         *  - checking whether user's changed the value, {@link JQuery.dirty}
+         *  - checking whether user's interacted any way with the control, {@link JQuery.touched}
+         * @param valueChangesUI Observable to use for observing values, instead of the default `valueChanges`. Note: `val(value)` will also make it emit values.
+         * @param touchedUI$ Sets `touched = true` every time it emits.
+         * @param dirtyUI$ Sets `dirty = true` every time it emits.
          */
-        convertToFormControl(): JQuery<FormControlType | HTMLFormElement>;
+        convertToFormControl(valueChangesUI?: Observable<any>, touchedUI$?: Observable<void>, dirtyUI$?: Observable<void>): JQuery<FormControlType | HTMLFormElement>;
+        /**
+         * @description
+         * Reports the value of the control if it is present, otherwise null.
+         * Interchangeable with jQuery's `val()`.
+         */
+        readonly value: any;
         /**
          * @description
          * Reports whether the control is valid. A control is considered valid if no
@@ -245,6 +256,8 @@ declare namespace JQueryInternal {
          * Set to true on form controls, otherwise undefined.
          */
         isFormControl: boolean;
+        isFormGroup: boolean;
+        value: any;
         valid: boolean | null;
         invalid: boolean | null;
         disabled: boolean;

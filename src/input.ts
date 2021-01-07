@@ -1,29 +1,51 @@
 ﻿import {BehaviorSubject, EMPTY, fromEvent, merge, Observable, Subject} from "rxjs";
 import {delay, distinctUntilChanged, filter, map, share, skip, switchMap, tap} from "rxjs/operators";
 import {disableValidation, enableValidation, getValidators, hasError, setValidators, updateValidity} from "./validation";
-import {cachedFormControls, checkIfRadioGroup, extractRadioGroups, isFormControlType, FormControlStatus} from "./misc";
+import {cachedControlsAndGroups, checkIfRadioGroup, extractRadioGroups, isFormControlType, FormControlStatus} from "./misc";
 import JQuery = JQueryInternal.JQueryInternal;
 import {JQueryInternal} from "../@types/input";
+
+
+let originalInit = (jQuery.fn as any).init;
+
+/**
+ * Form control is the extended jQuery object of a single input element.
+ */
+let formControl = function (jQueryObject): void {
+    originalInit.call(this, jQueryObject);
+    this.isFormControl = true;
+};
+
+/**
+ * Form group is the extended jQuery object of multiple input elements, or a form.
+ */
+let formGroup = function (jQueryObject): void {
+    originalInit.call(this, jQueryObject);
+    this.isFormGroup = true;
+};
+formControl.prototype = new originalInit();
+formGroup.prototype = new originalInit();
+
 
 export function extendFormElements(): void {
     let baseAttrFn = jQuery.fn.attr;
     let baseValFn = jQuery.fn.val;
 
     jQuery.fn.extend({
-        val: function (value_function: any): any {
+        val(value_function: any): any {
 
-            if (value_function === undefined && this.isFormControl)
-                return getFormControlValue(this);
+            if (value_function === undefined && (this.isFormControl || this.isFormGroup))
+                return this.value ?? baseValFn.apply(this, arguments);
 
             let result = baseValFn.apply(this, arguments);
 
             // Emit new valueChanges value.
-            if (!(value_function instanceof Function) && value_function !== undefined && ($(this) as any).valueChangesSubject)
-                this.each(_ => ($(this) as any).valueChangesSubject.next(value_function as string));
+            if (!(value_function instanceof Function) && value_function !== undefined && (this.isFormControl || this.isFormGroup))
+                this.valueChangesSubject.next(value_function as string);
 
             return result;
         },
-        attr: function (attributeName: string, value_function: any): JQuery<HTMLElement> {
+        attr(attributeName: string, value_function: any): JQuery<HTMLElement> {
 
             // Extend "disabled" attribute to affect autocomplete display fields,
             // and to trigger validation
@@ -64,7 +86,7 @@ export function extendFormElements(): void {
         markAllAsTouched(): void {
             this.touched = true;
             this.touchedSubject.next(true);
-            
+
             this.selectedFormControls?.forEach($d => $d.markAsTouched());
         },
         markAsUntouched(): void {
@@ -82,23 +104,25 @@ export function extendFormElements(): void {
         },
         markAllAsDirty(): void {
             this.markAsDirty();
-            
+
             this.selectedFormControls?.forEach($d => $d.markAsDirty());
         },
         markAsPristine(): void {
             this.pristine = true;
             this.dirtySubject?.next(false);
-            
+
             this.selectedFormControls?.forEach($d => {
                 $d.pristine = true;
                 $d?.dirtySubject?.next(false);
             })
         },
-        enableValidation(): void {
+        enableValidation(): JQuery<FormControlType | HTMLFormElement> {
             enableValidation(this);
+            return this;
         },
-        disableValidation(): void {
+        disableValidation(): JQuery<FormControlType | HTMLFormElement> {
             disableValidation(this);
+            return this;
         },
         setValidators(newValidator: ValidatorFn[] | null): void {
             return setValidators(this, newValidator);
@@ -139,51 +163,39 @@ export function extendFormElements(): void {
             let descendants = this.selectedFormControls;
             descendants.forEach($e => $e.errors != null && console.log($e, $e.errors))
         },
-        convertToFormControl(): JQuery<FormControlType | HTMLFormElement> {
-            return convertToFormControl(this);
+        convertToFormControl(valueChangesUI?: Observable<any>, touchedUI$?: Observable<void>, dirtyUI$?: Observable<void>): JQuery<FormControlType | HTMLFormElement> {
+            return convertToFormControl(this, valueChangesUI, touchedUI$, dirtyUI$);
         }
     });
 
-    let originalInit = (jQuery.fn as any).init;
 
-    /**
-     * Form control is the extended jQuery object of a single input element.
-     */
-    let formControl = function (jQueryObject): void {
-        originalInit.call(this, jQueryObject);
-        this.isFormControl = true;
-    };
-
-    /**
-     * Form group is the extended jQuery object of multiple input elements, or a form.
-     */
-    let formGroup = function (jQueryObject): void {
-        originalInit.call(this, jQueryObject);
-        this.isFormControl = true;
-    };
-    formControl.prototype = new originalInit();
-    formGroup.prototype = new originalInit();
-
-    // Constructor
+    /*===== Constructor =====*/
     (jQuery.fn as any).init = function () {
         let jQueryObject = new originalInit(arguments[0], arguments[1]);
 
         if (areFormControlsSelected(jQueryObject) === false)
             return jQueryObject;
 
-        return convertToFormControl(isGroupSelected(jQueryObject) ? new formGroup(jQueryObject) : new formControl(jQueryObject));
+        return convertToFormControl(jQueryObject);
     }
 
     function areFormControlsSelected(jQueryObject: JQuery<HTMLElement>): boolean {
         return jQueryObject.toArray().some(singleJQueryObject => isFormControlType(singleJQueryObject) || singleJQueryObject instanceof HTMLFormElement);
     }
 
-    function isGroupSelected(jQueryObject: JQuery<HTMLElement>): boolean {
-        return jQueryObject.toArray().filter(singleJQueryObject => isFormControlType(singleJQueryObject)).length > 1 && !checkIfRadioGroup(jQueryObject) || jQueryObject[0] instanceof HTMLFormElement;
-    }
 }
 
-export function convertToFormControl(jQueryObject: JQuery<FormControlType | HTMLFormElement>): JQuery<FormControlType | HTMLFormElement> {
+
+/**
+ * @see {@link JQuery.convertToFormControl}
+ */
+export function convertToFormControl(jQueryObject: JQuery<FormControlType | HTMLFormElement>,
+                                     valueChangesUI: Observable<any> = null,
+                                     touchedUI$: Observable<void> = null,
+                                     dirtyUI$: Observable<void> = null): JQuery<FormControlType | HTMLFormElement> {
+
+    // Use fancy names in the Dev console.
+    jQueryObject = isGroupSelected(jQueryObject) ? new formGroup(jQueryObject) : new formControl(jQueryObject);
 
     // See if it's cached
     let cachedElement = findCachedElement(jQueryObject);
@@ -219,10 +231,10 @@ export function convertToFormControl(jQueryObject: JQuery<FormControlType | HTML
 
     // Check new selected elements if they are indeed form control
     jQueryObject.selectedFormControls$.pipe(skip(1)).subscribe(selectedFormControls =>
-        selectedFormControls.filter($formControl => !$formControl.isFormControl).forEach($formControl => convertToFormControl($formControl)));
+        selectedFormControls.filter($formControl => !$formControl.isFormControl && !$formControl.isFormGroup).forEach($formControl => convertToFormControl($formControl)));
 
 
-    addFormControlProperties(jQueryObject as JQuery<FormControlType>);
+    addFormControlProperties(jQueryObject as JQuery<FormControlType>, valueChangesUI, touchedUI$, dirtyUI$);
 
     // Cache it
     addToCache(jQueryObject);
@@ -230,46 +242,60 @@ export function convertToFormControl(jQueryObject: JQuery<FormControlType | HTML
     return jQueryObject as JQuery<FormControlType>;
 }
 
-function addFormControlProperties(jQueryObject: JQuery<FormControlType | HTMLFormElement>): void {
+function addFormControlProperties(jQueryObject: JQuery<FormControlType | HTMLFormElement>,
+                                  valueChangesUI: Observable<any> = null,
+                                  touchedUI$: Observable<void> = null,
+                                  dirtyUI$: Observable<void> = null): void {
 
     addComplementaryGettersSetters(jQueryObject);
 
     let valueChangesSubject = new Subject<any>();
     jQueryObject.valueChangesSubject = valueChangesSubject;
 
-    jQueryObject.selectedFormControls$
-        .pipe(
+    valueChangesUI = valueChangesUI
+        ? valueChangesUI
+        : jQueryObject.selectedFormControls$.pipe(
             switchMap(selectedFormControls => selectedFormControls.length === 1
                 ? fromEvent(jQueryObject, 'input')
                 : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.valueChanges)).pipe(delay(1))
-                // Note: delay makes sure value change of an individual control would trigger subscription handlers before group one's would. (RxJS is synchronous by default)
-                
-            ))
-        .subscribe(_ => valueChangesSubject.next(null));
-    
-    jQueryObject.valueChanges = valueChangesSubject.asObservable().pipe(map(_ => getFormControlValue(jQueryObject)), distinctUntilChanged(), share());
-    
-    // Dirty state
-    jQueryObject.dirtySubject = new Subject<boolean>();
-    jQueryObject.markAsPristine();
-    
-    jQueryObject.selectedFormControls$
-        .pipe(
-            switchMap(selectedFormControls => selectedFormControls.length === 1
-                ? fromEvent(jQueryObject, 'input')
-                : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.dirtySubject.asObservable())).pipe(filter(isDirty => isDirty), delay(1)))
-        ).subscribe(_ => jQueryObject.markAsDirty());
-    
+                // Note: delay makes sure value change of an individual control would trigger its subscription handlers before group one's would. (RxJS is synchronous by default)
+
+            ),
+            map(_ => getFormControlValue(jQueryObject))
+        );
+
+    valueChangesUI.subscribe(value => valueChangesSubject.next(value));
+    jQueryObject.valueChanges = valueChangesSubject.asObservable().pipe(distinctUntilChanged(), share());
+    jQueryObject.valueChanges.subscribe(value => jQueryObject.value = value);
+
     // Touched state
     jQueryObject.touchedSubject = new Subject<boolean>();
     jQueryObject.markAsUntouched();
-    
-    jQueryObject.selectedFormControls$
-        .pipe(
+
+    touchedUI$ = touchedUI$
+        ? touchedUI$
+        : jQueryObject.selectedFormControls$.pipe(
             switchMap(selectedFormControls => selectedFormControls.length === 1
                 ? fromEvent(jQueryObject, 'focus')
-                : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.touchedSubject.asObservable())).pipe(filter(isTouched => isTouched), delay(1)))
-        ).subscribe(_ => jQueryObject.markAsTouched());
+                : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.touchedSubject.asObservable())).pipe(filter(isTouched => isTouched), delay(1))
+            )) as any;
+
+    touchedUI$.subscribe(_ => jQueryObject.markAsTouched());
+
+
+    // Dirty state
+    jQueryObject.dirtySubject = new Subject<boolean>();
+    jQueryObject.markAsPristine();
+
+    dirtyUI$ = dirtyUI$
+        ? dirtyUI$
+        : jQueryObject.selectedFormControls$.pipe(
+            switchMap(selectedFormControls => selectedFormControls.length === 1
+                ? fromEvent(jQueryObject, 'input')
+                : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.dirtySubject.asObservable())).pipe(filter(isDirty => isDirty), delay(1))
+            )) as any;
+
+    dirtyUI$.subscribe(_ => jQueryObject.markAsDirty());
 }
 
 /**
@@ -327,14 +353,17 @@ function getFormControlValue(jQueryObject: JQuery<FormControlType | HTMLFormElem
 }
 
 /**
- * Finds the cached version of the form control and returns it, otherwise returns null.
+ * Finds the cached version of the form control / group and returns it, otherwise returns null.
  *
- * Elements are compared based on the results of the original query, and not on assigned selectedFormControls.
+ * Elements are checked using their selectedFormControls array, so it check an up-to-date version of a form group;
  * @param jQueryObject
  */
 function findCachedElement(jQueryObject: JQuery<FormControlType | HTMLFormElement>): JQuery<FormControlType | HTMLFormElement> | null {
-    return cachedFormControls
-        .find($cachedFormControl => $cachedFormControl.length === jQueryObject.length && $cachedFormControl.toArray().every(element => jQueryObject.toArray().includes(element))) ?? null;
+    return cachedControlsAndGroups
+        .find($cachedFormControl => $cachedFormControl.selectedFormControls.length === jQueryObject.length
+            && $cachedFormControl.selectedFormControls
+                .flatMap($e => $e.toArray())
+                .every(element => jQueryObject.toArray().includes(element))) ?? null;
 }
 
 /**
@@ -342,7 +371,11 @@ function findCachedElement(jQueryObject: JQuery<FormControlType | HTMLFormElemen
  * @see findCachedElement()
  */
 function addToCache(jQueryObject: JQuery<FormControlType | HTMLFormElement>): void {
-    cachedFormControls.push(jQueryObject);
+    cachedControlsAndGroups.push(jQueryObject);
+}
+
+function isGroupSelected(jQueryObject: JQuery<HTMLElement>): boolean {
+    return jQueryObject.toArray().filter(singleJQueryObject => isFormControlType(singleJQueryObject)).length > 1 && !checkIfRadioGroup(jQueryObject) || jQueryObject[0] instanceof HTMLFormElement;
 }
 
 /**

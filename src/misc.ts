@@ -4,7 +4,7 @@ import {JQueryInternal} from "../@types/input";
  * Caches form controls so they are not initialized again.
  * Note: Declared in misc.ts so it's available in both input and validation.
  */
-export const cachedFormControls: JQueryInternal.JQueryInternal<FormControlType | HTMLFormElement>[] = [];
+export const cachedControlsAndGroups: JQueryInternal.JQueryInternal<FormControlType | HTMLFormElement>[] = [];
 
 export function isNullOrWhitespace(searchTerm: string): boolean {
     return searchTerm == null || (/\S/.test(searchTerm)) === false;

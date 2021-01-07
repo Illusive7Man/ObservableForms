@@ -5,7 +5,7 @@ import preventOverflow from '@popperjs/core/lib/modifiers/preventOverflow.js';
 import offset from '@popperjs/core/lib/modifiers/offset.js';
 import {Options} from '@popperjs/core/lib/modifiers/offset';
 import {BehaviorSubject, fromEvent, merge, NEVER, of, Subject} from "rxjs";
-import {cachedFormControls, checkIfRadioGroup, isFormControlType, FormControlStatus} from "./misc";
+import {cachedControlsAndGroups, checkIfRadioGroup, isFormControlType, FormControlStatus} from "./misc";
 import JQuery = JQueryInternal.JQueryInternal;
 import {JQueryInternal} from "../@types/input";
 import {fromFullVisibility} from "./ observable/fromFullVisibility";
@@ -20,7 +20,7 @@ export function enableValidation(jQueryObject: JQuery<FormControlType | HTMLForm
         return;
     
     // Check if it's actually a form control (maybe it's empty)
-    if (jQueryObject.isFormControl !== true)
+    if (!jQueryObject.isFormControl && !jQueryObject.isFormGroup)
         jQueryObject.convertToFormControl();
 
     jQueryObject.selectedFormControls$.subscribe(selectedFormControls => 
@@ -281,7 +281,7 @@ function determinePopperPositioning(jQueryObject: JQuery<FormControlType | HTMLF
         let referenceRect = reference.getBoundingClientRect();
 
         // Form controls that come before current one in DOM.
-        let previousFormControlElements = cachedFormControls.slice(0, cachedFormControls.indexOf($formControl))
+        let previousFormControlElements = cachedControlsAndGroups.slice(0, cachedControlsAndGroups.indexOf($formControl))
             .flatMap($e => $e.toArray())
             .filter(element => isFormControlType(element));
 
