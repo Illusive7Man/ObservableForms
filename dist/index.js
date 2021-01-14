@@ -12,6 +12,31 @@ LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ***************************************************************************** */
+
+function __awaiter(thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+}
+
+/*! *****************************************************************************
+Copyright (c) Microsoft Corporation.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+***************************************************************************** */
 /* global Reflect, Promise */
 
 var extendStatics = function(d, b) {
@@ -622,6 +647,1070 @@ function getPromiseCtor(promiseCtor) {
 }
 
 /** PURE_IMPORTS_START  PURE_IMPORTS_END */
+var subscribeToArray = function (array) {
+    return function (subscriber) {
+        for (var i = 0, len = array.length; i < len && !subscriber.closed; i++) {
+            subscriber.next(array[i]);
+        }
+        subscriber.complete();
+    };
+};
+
+/** PURE_IMPORTS_START _hostReportError PURE_IMPORTS_END */
+var subscribeToPromise = function (promise) {
+    return function (subscriber) {
+        promise.then(function (value) {
+            if (!subscriber.closed) {
+                subscriber.next(value);
+                subscriber.complete();
+            }
+        }, function (err) { return subscriber.error(err); })
+            .then(null, hostReportError);
+        return subscriber;
+    };
+};
+
+/** PURE_IMPORTS_START  PURE_IMPORTS_END */
+function getSymbolIterator() {
+    if (typeof Symbol !== 'function' || !Symbol.iterator) {
+        return '@@iterator';
+    }
+    return Symbol.iterator;
+}
+var iterator = /*@__PURE__*/ getSymbolIterator();
+
+/** PURE_IMPORTS_START _symbol_iterator PURE_IMPORTS_END */
+var subscribeToIterable = function (iterable) {
+    return function (subscriber) {
+        var iterator$1 = iterable[iterator]();
+        do {
+            var item = void 0;
+            try {
+                item = iterator$1.next();
+            }
+            catch (err) {
+                subscriber.error(err);
+                return subscriber;
+            }
+            if (item.done) {
+                subscriber.complete();
+                break;
+            }
+            subscriber.next(item.value);
+            if (subscriber.closed) {
+                break;
+            }
+        } while (true);
+        if (typeof iterator$1.return === 'function') {
+            subscriber.add(function () {
+                if (iterator$1.return) {
+                    iterator$1.return();
+                }
+            });
+        }
+        return subscriber;
+    };
+};
+
+/** PURE_IMPORTS_START _symbol_observable PURE_IMPORTS_END */
+var subscribeToObservable = function (obj) {
+    return function (subscriber) {
+        var obs = obj[observable]();
+        if (typeof obs.subscribe !== 'function') {
+            throw new TypeError('Provided object does not correctly implement Symbol.observable');
+        }
+        else {
+            return obs.subscribe(subscriber);
+        }
+    };
+};
+
+/** PURE_IMPORTS_START  PURE_IMPORTS_END */
+var isArrayLike = (function (x) { return x && typeof x.length === 'number' && typeof x !== 'function'; });
+
+/** PURE_IMPORTS_START  PURE_IMPORTS_END */
+function isPromise(value) {
+    return !!value && typeof value.subscribe !== 'function' && typeof value.then === 'function';
+}
+
+/** PURE_IMPORTS_START _subscribeToArray,_subscribeToPromise,_subscribeToIterable,_subscribeToObservable,_isArrayLike,_isPromise,_isObject,_symbol_iterator,_symbol_observable PURE_IMPORTS_END */
+var subscribeTo = function (result) {
+    if (!!result && typeof result[observable] === 'function') {
+        return subscribeToObservable(result);
+    }
+    else if (isArrayLike(result)) {
+        return subscribeToArray(result);
+    }
+    else if (isPromise(result)) {
+        return subscribeToPromise(result);
+    }
+    else if (!!result && typeof result[iterator] === 'function') {
+        return subscribeToIterable(result);
+    }
+    else {
+        var value = isObject(result) ? 'an invalid object' : "'" + result + "'";
+        var msg = "You provided " + value + " where a stream was expected."
+            + ' You can provide an Observable, Promise, Array, or Iterable.';
+        throw new TypeError(msg);
+    }
+};
+
+/** PURE_IMPORTS_START tslib,_Subscriber,_Observable,_util_subscribeTo PURE_IMPORTS_END */
+var SimpleInnerSubscriber = /*@__PURE__*/ (function (_super) {
+    __extends(SimpleInnerSubscriber, _super);
+    function SimpleInnerSubscriber(parent) {
+        var _this = _super.call(this) || this;
+        _this.parent = parent;
+        return _this;
+    }
+    SimpleInnerSubscriber.prototype._next = function (value) {
+        this.parent.notifyNext(value);
+    };
+    SimpleInnerSubscriber.prototype._error = function (error) {
+        this.parent.notifyError(error);
+        this.unsubscribe();
+    };
+    SimpleInnerSubscriber.prototype._complete = function () {
+        this.parent.notifyComplete();
+        this.unsubscribe();
+    };
+    return SimpleInnerSubscriber;
+}(Subscriber));
+var SimpleOuterSubscriber = /*@__PURE__*/ (function (_super) {
+    __extends(SimpleOuterSubscriber, _super);
+    function SimpleOuterSubscriber() {
+        return _super !== null && _super.apply(this, arguments) || this;
+    }
+    SimpleOuterSubscriber.prototype.notifyNext = function (innerValue) {
+        this.destination.next(innerValue);
+    };
+    SimpleOuterSubscriber.prototype.notifyError = function (err) {
+        this.destination.error(err);
+    };
+    SimpleOuterSubscriber.prototype.notifyComplete = function () {
+        this.destination.complete();
+    };
+    return SimpleOuterSubscriber;
+}(Subscriber));
+function innerSubscribe(result, innerSubscriber) {
+    if (innerSubscriber.closed) {
+        return undefined;
+    }
+    if (result instanceof Observable) {
+        return result.subscribe(innerSubscriber);
+    }
+    return subscribeTo(result)(innerSubscriber);
+}
+
+/** PURE_IMPORTS_START tslib,_Subscription PURE_IMPORTS_END */
+var Action = /*@__PURE__*/ (function (_super) {
+    __extends(Action, _super);
+    function Action(scheduler, work) {
+        return _super.call(this) || this;
+    }
+    Action.prototype.schedule = function (state, delay) {
+        return this;
+    };
+    return Action;
+}(Subscription));
+
+/** PURE_IMPORTS_START tslib,_Action PURE_IMPORTS_END */
+var AsyncAction = /*@__PURE__*/ (function (_super) {
+    __extends(AsyncAction, _super);
+    function AsyncAction(scheduler, work) {
+        var _this = _super.call(this, scheduler, work) || this;
+        _this.scheduler = scheduler;
+        _this.work = work;
+        _this.pending = false;
+        return _this;
+    }
+    AsyncAction.prototype.schedule = function (state, delay) {
+        if (delay === void 0) {
+            delay = 0;
+        }
+        if (this.closed) {
+            return this;
+        }
+        this.state = state;
+        var id = this.id;
+        var scheduler = this.scheduler;
+        if (id != null) {
+            this.id = this.recycleAsyncId(scheduler, id, delay);
+        }
+        this.pending = true;
+        this.delay = delay;
+        this.id = this.id || this.requestAsyncId(scheduler, this.id, delay);
+        return this;
+    };
+    AsyncAction.prototype.requestAsyncId = function (scheduler, id, delay) {
+        if (delay === void 0) {
+            delay = 0;
+        }
+        return setInterval(scheduler.flush.bind(scheduler, this), delay);
+    };
+    AsyncAction.prototype.recycleAsyncId = function (scheduler, id, delay) {
+        if (delay === void 0) {
+            delay = 0;
+        }
+        if (delay !== null && this.delay === delay && this.pending === false) {
+            return id;
+        }
+        clearInterval(id);
+        return undefined;
+    };
+    AsyncAction.prototype.execute = function (state, delay) {
+        if (this.closed) {
+            return new Error('executing a cancelled action');
+        }
+        this.pending = false;
+        var error = this._execute(state, delay);
+        if (error) {
+            return error;
+        }
+        else if (this.pending === false && this.id != null) {
+            this.id = this.recycleAsyncId(this.scheduler, this.id, null);
+        }
+    };
+    AsyncAction.prototype._execute = function (state, delay) {
+        var errored = false;
+        var errorValue = undefined;
+        try {
+            this.work(state);
+        }
+        catch (e) {
+            errored = true;
+            errorValue = !!e && e || new Error(e);
+        }
+        if (errored) {
+            this.unsubscribe();
+            return errorValue;
+        }
+    };
+    AsyncAction.prototype._unsubscribe = function () {
+        var id = this.id;
+        var scheduler = this.scheduler;
+        var actions = scheduler.actions;
+        var index = actions.indexOf(this);
+        this.work = null;
+        this.state = null;
+        this.pending = false;
+        this.scheduler = null;
+        if (index !== -1) {
+            actions.splice(index, 1);
+        }
+        if (id != null) {
+            this.id = this.recycleAsyncId(scheduler, id, null);
+        }
+        this.delay = null;
+    };
+    return AsyncAction;
+}(Action));
+
+var Scheduler = /*@__PURE__*/ (function () {
+    function Scheduler(SchedulerAction, now) {
+        if (now === void 0) {
+            now = Scheduler.now;
+        }
+        this.SchedulerAction = SchedulerAction;
+        this.now = now;
+    }
+    Scheduler.prototype.schedule = function (work, delay, state) {
+        if (delay === void 0) {
+            delay = 0;
+        }
+        return new this.SchedulerAction(this, work).schedule(state, delay);
+    };
+    Scheduler.now = function () { return Date.now(); };
+    return Scheduler;
+}());
+
+/** PURE_IMPORTS_START tslib,_Scheduler PURE_IMPORTS_END */
+var AsyncScheduler = /*@__PURE__*/ (function (_super) {
+    __extends(AsyncScheduler, _super);
+    function AsyncScheduler(SchedulerAction, now) {
+        if (now === void 0) {
+            now = Scheduler.now;
+        }
+        var _this = _super.call(this, SchedulerAction, function () {
+            if (AsyncScheduler.delegate && AsyncScheduler.delegate !== _this) {
+                return AsyncScheduler.delegate.now();
+            }
+            else {
+                return now();
+            }
+        }) || this;
+        _this.actions = [];
+        _this.active = false;
+        _this.scheduled = undefined;
+        return _this;
+    }
+    AsyncScheduler.prototype.schedule = function (work, delay, state) {
+        if (delay === void 0) {
+            delay = 0;
+        }
+        if (AsyncScheduler.delegate && AsyncScheduler.delegate !== this) {
+            return AsyncScheduler.delegate.schedule(work, delay, state);
+        }
+        else {
+            return _super.prototype.schedule.call(this, work, delay, state);
+        }
+    };
+    AsyncScheduler.prototype.flush = function (action) {
+        var actions = this.actions;
+        if (this.active) {
+            actions.push(action);
+            return;
+        }
+        var error;
+        this.active = true;
+        do {
+            if (error = action.execute(action.state, action.delay)) {
+                break;
+            }
+        } while (action = actions.shift());
+        this.active = false;
+        if (error) {
+            while (action = actions.shift()) {
+                action.unsubscribe();
+            }
+            throw error;
+        }
+    };
+    return AsyncScheduler;
+}(Scheduler));
+
+/** PURE_IMPORTS_START _AsyncAction,_AsyncScheduler PURE_IMPORTS_END */
+var asyncScheduler = /*@__PURE__*/ new AsyncScheduler(AsyncAction);
+var async = asyncScheduler;
+
+/** PURE_IMPORTS_START  PURE_IMPORTS_END */
+function isScheduler(value) {
+    return value && typeof value.schedule === 'function';
+}
+
+/** PURE_IMPORTS_START _Observable,_Subscription PURE_IMPORTS_END */
+function scheduleArray(input, scheduler) {
+    return new Observable(function (subscriber) {
+        var sub = new Subscription();
+        var i = 0;
+        sub.add(scheduler.schedule(function () {
+            if (i === input.length) {
+                subscriber.complete();
+                return;
+            }
+            subscriber.next(input[i++]);
+            if (!subscriber.closed) {
+                sub.add(this.schedule());
+            }
+        }));
+        return sub;
+    });
+}
+
+/** PURE_IMPORTS_START _Observable,_util_subscribeToArray,_scheduled_scheduleArray PURE_IMPORTS_END */
+function fromArray(input, scheduler) {
+    if (!scheduler) {
+        return new Observable(subscribeToArray(input));
+    }
+    else {
+        return scheduleArray(input, scheduler);
+    }
+}
+
+/** PURE_IMPORTS_START _Observable,_Subscription,_symbol_observable PURE_IMPORTS_END */
+function scheduleObservable(input, scheduler) {
+    return new Observable(function (subscriber) {
+        var sub = new Subscription();
+        sub.add(scheduler.schedule(function () {
+            var observable$1 = input[observable]();
+            sub.add(observable$1.subscribe({
+                next: function (value) { sub.add(scheduler.schedule(function () { return subscriber.next(value); })); },
+                error: function (err) { sub.add(scheduler.schedule(function () { return subscriber.error(err); })); },
+                complete: function () { sub.add(scheduler.schedule(function () { return subscriber.complete(); })); },
+            }));
+        }));
+        return sub;
+    });
+}
+
+/** PURE_IMPORTS_START _Observable,_Subscription PURE_IMPORTS_END */
+function schedulePromise(input, scheduler) {
+    return new Observable(function (subscriber) {
+        var sub = new Subscription();
+        sub.add(scheduler.schedule(function () {
+            return input.then(function (value) {
+                sub.add(scheduler.schedule(function () {
+                    subscriber.next(value);
+                    sub.add(scheduler.schedule(function () { return subscriber.complete(); }));
+                }));
+            }, function (err) {
+                sub.add(scheduler.schedule(function () { return subscriber.error(err); }));
+            });
+        }));
+        return sub;
+    });
+}
+
+/** PURE_IMPORTS_START _Observable,_Subscription,_symbol_iterator PURE_IMPORTS_END */
+function scheduleIterable(input, scheduler) {
+    if (!input) {
+        throw new Error('Iterable cannot be null');
+    }
+    return new Observable(function (subscriber) {
+        var sub = new Subscription();
+        var iterator$1;
+        sub.add(function () {
+            if (iterator$1 && typeof iterator$1.return === 'function') {
+                iterator$1.return();
+            }
+        });
+        sub.add(scheduler.schedule(function () {
+            iterator$1 = input[iterator]();
+            sub.add(scheduler.schedule(function () {
+                if (subscriber.closed) {
+                    return;
+                }
+                var value;
+                var done;
+                try {
+                    var result = iterator$1.next();
+                    value = result.value;
+                    done = result.done;
+                }
+                catch (err) {
+                    subscriber.error(err);
+                    return;
+                }
+                if (done) {
+                    subscriber.complete();
+                }
+                else {
+                    subscriber.next(value);
+                    this.schedule();
+                }
+            }));
+        }));
+        return sub;
+    });
+}
+
+/** PURE_IMPORTS_START _symbol_observable PURE_IMPORTS_END */
+function isInteropObservable(input) {
+    return input && typeof input[observable] === 'function';
+}
+
+/** PURE_IMPORTS_START _symbol_iterator PURE_IMPORTS_END */
+function isIterable(input) {
+    return input && typeof input[iterator] === 'function';
+}
+
+/** PURE_IMPORTS_START _scheduleObservable,_schedulePromise,_scheduleArray,_scheduleIterable,_util_isInteropObservable,_util_isPromise,_util_isArrayLike,_util_isIterable PURE_IMPORTS_END */
+function scheduled(input, scheduler) {
+    if (input != null) {
+        if (isInteropObservable(input)) {
+            return scheduleObservable(input, scheduler);
+        }
+        else if (isPromise(input)) {
+            return schedulePromise(input, scheduler);
+        }
+        else if (isArrayLike(input)) {
+            return scheduleArray(input, scheduler);
+        }
+        else if (isIterable(input) || typeof input === 'string') {
+            return scheduleIterable(input, scheduler);
+        }
+    }
+    throw new TypeError((input !== null && typeof input || input) + ' is not observable');
+}
+
+/** PURE_IMPORTS_START _Observable,_util_subscribeTo,_scheduled_scheduled PURE_IMPORTS_END */
+function from(input, scheduler) {
+    if (!scheduler) {
+        if (input instanceof Observable) {
+            return input;
+        }
+        return new Observable(subscribeTo(input));
+    }
+    else {
+        return scheduled(input, scheduler);
+    }
+}
+
+/** PURE_IMPORTS_START _util_isScheduler,_fromArray,_scheduled_scheduleArray PURE_IMPORTS_END */
+function of() {
+    var args = [];
+    for (var _i = 0; _i < arguments.length; _i++) {
+        args[_i] = arguments[_i];
+    }
+    var scheduler = args[args.length - 1];
+    if (isScheduler(scheduler)) {
+        args.pop();
+        return scheduleArray(args, scheduler);
+    }
+    else {
+        return fromArray(args);
+    }
+}
+
+/** PURE_IMPORTS_START tslib,_Subscriber PURE_IMPORTS_END */
+function map(project, thisArg) {
+    return function mapOperation(source) {
+        if (typeof project !== 'function') {
+            throw new TypeError('argument is not a function. Are you looking for `mapTo()`?');
+        }
+        return source.lift(new MapOperator(project, thisArg));
+    };
+}
+var MapOperator = /*@__PURE__*/ (function () {
+    function MapOperator(project, thisArg) {
+        this.project = project;
+        this.thisArg = thisArg;
+    }
+    MapOperator.prototype.call = function (subscriber, source) {
+        return source.subscribe(new MapSubscriber(subscriber, this.project, this.thisArg));
+    };
+    return MapOperator;
+}());
+var MapSubscriber = /*@__PURE__*/ (function (_super) {
+    __extends(MapSubscriber, _super);
+    function MapSubscriber(destination, project, thisArg) {
+        var _this = _super.call(this, destination) || this;
+        _this.project = project;
+        _this.count = 0;
+        _this.thisArg = thisArg || _this;
+        return _this;
+    }
+    MapSubscriber.prototype._next = function (value) {
+        var result;
+        try {
+            result = this.project.call(this.thisArg, value, this.count++);
+        }
+        catch (err) {
+            this.destination.error(err);
+            return;
+        }
+        this.destination.next(result);
+    };
+    return MapSubscriber;
+}(Subscriber));
+
+/** PURE_IMPORTS_START tslib,_map,_observable_from,_innerSubscribe PURE_IMPORTS_END */
+function mergeMap(project, resultSelector, concurrent) {
+    if (concurrent === void 0) {
+        concurrent = Number.POSITIVE_INFINITY;
+    }
+    if (typeof resultSelector === 'function') {
+        return function (source) { return source.pipe(mergeMap(function (a, i) { return from(project(a, i)).pipe(map(function (b, ii) { return resultSelector(a, b, i, ii); })); }, concurrent)); };
+    }
+    else if (typeof resultSelector === 'number') {
+        concurrent = resultSelector;
+    }
+    return function (source) { return source.lift(new MergeMapOperator(project, concurrent)); };
+}
+var MergeMapOperator = /*@__PURE__*/ (function () {
+    function MergeMapOperator(project, concurrent) {
+        if (concurrent === void 0) {
+            concurrent = Number.POSITIVE_INFINITY;
+        }
+        this.project = project;
+        this.concurrent = concurrent;
+    }
+    MergeMapOperator.prototype.call = function (observer, source) {
+        return source.subscribe(new MergeMapSubscriber(observer, this.project, this.concurrent));
+    };
+    return MergeMapOperator;
+}());
+var MergeMapSubscriber = /*@__PURE__*/ (function (_super) {
+    __extends(MergeMapSubscriber, _super);
+    function MergeMapSubscriber(destination, project, concurrent) {
+        if (concurrent === void 0) {
+            concurrent = Number.POSITIVE_INFINITY;
+        }
+        var _this = _super.call(this, destination) || this;
+        _this.project = project;
+        _this.concurrent = concurrent;
+        _this.hasCompleted = false;
+        _this.buffer = [];
+        _this.active = 0;
+        _this.index = 0;
+        return _this;
+    }
+    MergeMapSubscriber.prototype._next = function (value) {
+        if (this.active < this.concurrent) {
+            this._tryNext(value);
+        }
+        else {
+            this.buffer.push(value);
+        }
+    };
+    MergeMapSubscriber.prototype._tryNext = function (value) {
+        var result;
+        var index = this.index++;
+        try {
+            result = this.project(value, index);
+        }
+        catch (err) {
+            this.destination.error(err);
+            return;
+        }
+        this.active++;
+        this._innerSub(result);
+    };
+    MergeMapSubscriber.prototype._innerSub = function (ish) {
+        var innerSubscriber = new SimpleInnerSubscriber(this);
+        var destination = this.destination;
+        destination.add(innerSubscriber);
+        var innerSubscription = innerSubscribe(ish, innerSubscriber);
+        if (innerSubscription !== innerSubscriber) {
+            destination.add(innerSubscription);
+        }
+    };
+    MergeMapSubscriber.prototype._complete = function () {
+        this.hasCompleted = true;
+        if (this.active === 0 && this.buffer.length === 0) {
+            this.destination.complete();
+        }
+        this.unsubscribe();
+    };
+    MergeMapSubscriber.prototype.notifyNext = function (innerValue) {
+        this.destination.next(innerValue);
+    };
+    MergeMapSubscriber.prototype.notifyComplete = function () {
+        var buffer = this.buffer;
+        this.active--;
+        if (buffer.length > 0) {
+            this._next(buffer.shift());
+        }
+        else if (this.active === 0 && this.hasCompleted) {
+            this.destination.complete();
+        }
+    };
+    return MergeMapSubscriber;
+}(SimpleOuterSubscriber));
+
+/** PURE_IMPORTS_START _mergeMap,_util_identity PURE_IMPORTS_END */
+function mergeAll(concurrent) {
+    if (concurrent === void 0) {
+        concurrent = Number.POSITIVE_INFINITY;
+    }
+    return mergeMap(identity, concurrent);
+}
+
+/** PURE_IMPORTS_START _mergeAll PURE_IMPORTS_END */
+function concatAll() {
+    return mergeAll(1);
+}
+
+/** PURE_IMPORTS_START _of,_operators_concatAll PURE_IMPORTS_END */
+function concat() {
+    var observables = [];
+    for (var _i = 0; _i < arguments.length; _i++) {
+        observables[_i] = arguments[_i];
+    }
+    return concatAll()(of.apply(void 0, observables));
+}
+
+/** PURE_IMPORTS_START tslib,_Subscriber,_scheduler_async PURE_IMPORTS_END */
+function debounceTime(dueTime, scheduler) {
+    if (scheduler === void 0) {
+        scheduler = async;
+    }
+    return function (source) { return source.lift(new DebounceTimeOperator(dueTime, scheduler)); };
+}
+var DebounceTimeOperator = /*@__PURE__*/ (function () {
+    function DebounceTimeOperator(dueTime, scheduler) {
+        this.dueTime = dueTime;
+        this.scheduler = scheduler;
+    }
+    DebounceTimeOperator.prototype.call = function (subscriber, source) {
+        return source.subscribe(new DebounceTimeSubscriber(subscriber, this.dueTime, this.scheduler));
+    };
+    return DebounceTimeOperator;
+}());
+var DebounceTimeSubscriber = /*@__PURE__*/ (function (_super) {
+    __extends(DebounceTimeSubscriber, _super);
+    function DebounceTimeSubscriber(destination, dueTime, scheduler) {
+        var _this = _super.call(this, destination) || this;
+        _this.dueTime = dueTime;
+        _this.scheduler = scheduler;
+        _this.debouncedSubscription = null;
+        _this.lastValue = null;
+        _this.hasValue = false;
+        return _this;
+    }
+    DebounceTimeSubscriber.prototype._next = function (value) {
+        this.clearDebounce();
+        this.lastValue = value;
+        this.hasValue = true;
+        this.add(this.debouncedSubscription = this.scheduler.schedule(dispatchNext, this.dueTime, this));
+    };
+    DebounceTimeSubscriber.prototype._complete = function () {
+        this.debouncedNext();
+        this.destination.complete();
+    };
+    DebounceTimeSubscriber.prototype.debouncedNext = function () {
+        this.clearDebounce();
+        if (this.hasValue) {
+            var lastValue = this.lastValue;
+            this.lastValue = null;
+            this.hasValue = false;
+            this.destination.next(lastValue);
+        }
+    };
+    DebounceTimeSubscriber.prototype.clearDebounce = function () {
+        var debouncedSubscription = this.debouncedSubscription;
+        if (debouncedSubscription !== null) {
+            this.remove(debouncedSubscription);
+            debouncedSubscription.unsubscribe();
+            this.debouncedSubscription = null;
+        }
+    };
+    return DebounceTimeSubscriber;
+}(Subscriber));
+function dispatchNext(subscriber) {
+    subscriber.debouncedNext();
+}
+
+/** PURE_IMPORTS_START  PURE_IMPORTS_END */
+function isDate(value) {
+    return value instanceof Date && !isNaN(+value);
+}
+
+/** PURE_IMPORTS_START _Observable PURE_IMPORTS_END */
+var EMPTY = /*@__PURE__*/ new Observable(function (subscriber) { return subscriber.complete(); });
+function empty$1(scheduler) {
+    return scheduler ? emptyScheduled(scheduler) : EMPTY;
+}
+function emptyScheduled(scheduler) {
+    return new Observable(function (subscriber) { return scheduler.schedule(function () { return subscriber.complete(); }); });
+}
+
+/** PURE_IMPORTS_START _Observable PURE_IMPORTS_END */
+function throwError(error, scheduler) {
+    if (!scheduler) {
+        return new Observable(function (subscriber) { return subscriber.error(error); });
+    }
+    else {
+        return new Observable(function (subscriber) { return scheduler.schedule(dispatch, 0, { error: error, subscriber: subscriber }); });
+    }
+}
+function dispatch(_a) {
+    var error = _a.error, subscriber = _a.subscriber;
+    subscriber.error(error);
+}
+
+/** PURE_IMPORTS_START _observable_empty,_observable_of,_observable_throwError PURE_IMPORTS_END */
+var Notification = /*@__PURE__*/ (function () {
+    function Notification(kind, value, error) {
+        this.kind = kind;
+        this.value = value;
+        this.error = error;
+        this.hasValue = kind === 'N';
+    }
+    Notification.prototype.observe = function (observer) {
+        switch (this.kind) {
+            case 'N':
+                return observer.next && observer.next(this.value);
+            case 'E':
+                return observer.error && observer.error(this.error);
+            case 'C':
+                return observer.complete && observer.complete();
+        }
+    };
+    Notification.prototype.do = function (next, error, complete) {
+        var kind = this.kind;
+        switch (kind) {
+            case 'N':
+                return next && next(this.value);
+            case 'E':
+                return error && error(this.error);
+            case 'C':
+                return complete && complete();
+        }
+    };
+    Notification.prototype.accept = function (nextOrObserver, error, complete) {
+        if (nextOrObserver && typeof nextOrObserver.next === 'function') {
+            return this.observe(nextOrObserver);
+        }
+        else {
+            return this.do(nextOrObserver, error, complete);
+        }
+    };
+    Notification.prototype.toObservable = function () {
+        var kind = this.kind;
+        switch (kind) {
+            case 'N':
+                return of(this.value);
+            case 'E':
+                return throwError(this.error);
+            case 'C':
+                return empty$1();
+        }
+        throw new Error('unexpected notification kind value');
+    };
+    Notification.createNext = function (value) {
+        if (typeof value !== 'undefined') {
+            return new Notification('N', value);
+        }
+        return Notification.undefinedValueNotification;
+    };
+    Notification.createError = function (err) {
+        return new Notification('E', undefined, err);
+    };
+    Notification.createComplete = function () {
+        return Notification.completeNotification;
+    };
+    Notification.completeNotification = new Notification('C');
+    Notification.undefinedValueNotification = new Notification('N', undefined);
+    return Notification;
+}());
+
+/** PURE_IMPORTS_START tslib,_scheduler_async,_util_isDate,_Subscriber,_Notification PURE_IMPORTS_END */
+function delay(delay, scheduler) {
+    if (scheduler === void 0) {
+        scheduler = async;
+    }
+    var absoluteDelay = isDate(delay);
+    var delayFor = absoluteDelay ? (+delay - scheduler.now()) : Math.abs(delay);
+    return function (source) { return source.lift(new DelayOperator(delayFor, scheduler)); };
+}
+var DelayOperator = /*@__PURE__*/ (function () {
+    function DelayOperator(delay, scheduler) {
+        this.delay = delay;
+        this.scheduler = scheduler;
+    }
+    DelayOperator.prototype.call = function (subscriber, source) {
+        return source.subscribe(new DelaySubscriber(subscriber, this.delay, this.scheduler));
+    };
+    return DelayOperator;
+}());
+var DelaySubscriber = /*@__PURE__*/ (function (_super) {
+    __extends(DelaySubscriber, _super);
+    function DelaySubscriber(destination, delay, scheduler) {
+        var _this = _super.call(this, destination) || this;
+        _this.delay = delay;
+        _this.scheduler = scheduler;
+        _this.queue = [];
+        _this.active = false;
+        _this.errored = false;
+        return _this;
+    }
+    DelaySubscriber.dispatch = function (state) {
+        var source = state.source;
+        var queue = source.queue;
+        var scheduler = state.scheduler;
+        var destination = state.destination;
+        while (queue.length > 0 && (queue[0].time - scheduler.now()) <= 0) {
+            queue.shift().notification.observe(destination);
+        }
+        if (queue.length > 0) {
+            var delay_1 = Math.max(0, queue[0].time - scheduler.now());
+            this.schedule(state, delay_1);
+        }
+        else {
+            this.unsubscribe();
+            source.active = false;
+        }
+    };
+    DelaySubscriber.prototype._schedule = function (scheduler) {
+        this.active = true;
+        var destination = this.destination;
+        destination.add(scheduler.schedule(DelaySubscriber.dispatch, this.delay, {
+            source: this, destination: this.destination, scheduler: scheduler
+        }));
+    };
+    DelaySubscriber.prototype.scheduleNotification = function (notification) {
+        if (this.errored === true) {
+            return;
+        }
+        var scheduler = this.scheduler;
+        var message = new DelayMessage(scheduler.now() + this.delay, notification);
+        this.queue.push(message);
+        if (this.active === false) {
+            this._schedule(scheduler);
+        }
+    };
+    DelaySubscriber.prototype._next = function (value) {
+        this.scheduleNotification(Notification.createNext(value));
+    };
+    DelaySubscriber.prototype._error = function (err) {
+        this.errored = true;
+        this.queue = [];
+        this.destination.error(err);
+        this.unsubscribe();
+    };
+    DelaySubscriber.prototype._complete = function () {
+        this.scheduleNotification(Notification.createComplete());
+        this.unsubscribe();
+    };
+    return DelaySubscriber;
+}(Subscriber));
+var DelayMessage = /*@__PURE__*/ (function () {
+    function DelayMessage(time, notification) {
+        this.time = time;
+        this.notification = notification;
+    }
+    return DelayMessage;
+}());
+
+/** PURE_IMPORTS_START tslib,_Subscriber PURE_IMPORTS_END */
+function distinctUntilChanged(compare, keySelector) {
+    return function (source) { return source.lift(new DistinctUntilChangedOperator(compare, keySelector)); };
+}
+var DistinctUntilChangedOperator = /*@__PURE__*/ (function () {
+    function DistinctUntilChangedOperator(compare, keySelector) {
+        this.compare = compare;
+        this.keySelector = keySelector;
+    }
+    DistinctUntilChangedOperator.prototype.call = function (subscriber, source) {
+        return source.subscribe(new DistinctUntilChangedSubscriber(subscriber, this.compare, this.keySelector));
+    };
+    return DistinctUntilChangedOperator;
+}());
+var DistinctUntilChangedSubscriber = /*@__PURE__*/ (function (_super) {
+    __extends(DistinctUntilChangedSubscriber, _super);
+    function DistinctUntilChangedSubscriber(destination, compare, keySelector) {
+        var _this = _super.call(this, destination) || this;
+        _this.keySelector = keySelector;
+        _this.hasKey = false;
+        if (typeof compare === 'function') {
+            _this.compare = compare;
+        }
+        return _this;
+    }
+    DistinctUntilChangedSubscriber.prototype.compare = function (x, y) {
+        return x === y;
+    };
+    DistinctUntilChangedSubscriber.prototype._next = function (value) {
+        var key;
+        try {
+            var keySelector = this.keySelector;
+            key = keySelector ? keySelector(value) : value;
+        }
+        catch (err) {
+            return this.destination.error(err);
+        }
+        var result = false;
+        if (this.hasKey) {
+            try {
+                var compare = this.compare;
+                result = compare(this.key, key);
+            }
+            catch (err) {
+                return this.destination.error(err);
+            }
+        }
+        else {
+            this.hasKey = true;
+        }
+        if (!result) {
+            this.key = key;
+            this.destination.next(value);
+        }
+    };
+    return DistinctUntilChangedSubscriber;
+}(Subscriber));
+
+/** PURE_IMPORTS_START  PURE_IMPORTS_END */
+var ArgumentOutOfRangeErrorImpl = /*@__PURE__*/ (function () {
+    function ArgumentOutOfRangeErrorImpl() {
+        Error.call(this);
+        this.message = 'argument out of range';
+        this.name = 'ArgumentOutOfRangeError';
+        return this;
+    }
+    ArgumentOutOfRangeErrorImpl.prototype = /*@__PURE__*/ Object.create(Error.prototype);
+    return ArgumentOutOfRangeErrorImpl;
+})();
+var ArgumentOutOfRangeError = ArgumentOutOfRangeErrorImpl;
+
+/** PURE_IMPORTS_START tslib,_Subscriber PURE_IMPORTS_END */
+function filter(predicate, thisArg) {
+    return function filterOperatorFunction(source) {
+        return source.lift(new FilterOperator(predicate, thisArg));
+    };
+}
+var FilterOperator = /*@__PURE__*/ (function () {
+    function FilterOperator(predicate, thisArg) {
+        this.predicate = predicate;
+        this.thisArg = thisArg;
+    }
+    FilterOperator.prototype.call = function (subscriber, source) {
+        return source.subscribe(new FilterSubscriber(subscriber, this.predicate, this.thisArg));
+    };
+    return FilterOperator;
+}());
+var FilterSubscriber = /*@__PURE__*/ (function (_super) {
+    __extends(FilterSubscriber, _super);
+    function FilterSubscriber(destination, predicate, thisArg) {
+        var _this = _super.call(this, destination) || this;
+        _this.predicate = predicate;
+        _this.thisArg = thisArg;
+        _this.count = 0;
+        return _this;
+    }
+    FilterSubscriber.prototype._next = function (value) {
+        var result;
+        try {
+            result = this.predicate.call(this.thisArg, value, this.count++);
+        }
+        catch (err) {
+            this.destination.error(err);
+            return;
+        }
+        if (result) {
+            this.destination.next(value);
+        }
+    };
+    return FilterSubscriber;
+}(Subscriber));
+
+/** PURE_IMPORTS_START tslib,_Subscriber,_util_ArgumentOutOfRangeError,_observable_empty PURE_IMPORTS_END */
+function take(count) {
+    return function (source) {
+        if (count === 0) {
+            return empty$1();
+        }
+        else {
+            return source.lift(new TakeOperator(count));
+        }
+    };
+}
+var TakeOperator = /*@__PURE__*/ (function () {
+    function TakeOperator(total) {
+        this.total = total;
+        if (this.total < 0) {
+            throw new ArgumentOutOfRangeError;
+        }
+    }
+    TakeOperator.prototype.call = function (subscriber, source) {
+        return source.subscribe(new TakeSubscriber(subscriber, this.total));
+    };
+    return TakeOperator;
+}());
+var TakeSubscriber = /*@__PURE__*/ (function (_super) {
+    __extends(TakeSubscriber, _super);
+    function TakeSubscriber(destination, total) {
+        var _this = _super.call(this, destination) || this;
+        _this.total = total;
+        _this.count = 0;
+        return _this;
+    }
+    TakeSubscriber.prototype._next = function (value) {
+        var total = this.total;
+        var count = ++this.count;
+        if (count <= total) {
+            this.destination.next(value);
+            if (count === total) {
+                this.destination.complete();
+                this.unsubscribe();
+            }
+        }
+    };
+    return TakeSubscriber;
+}(Subscriber));
+
+/** PURE_IMPORTS_START  PURE_IMPORTS_END */
 var ObjectUnsubscribedErrorImpl = /*@__PURE__*/ (function () {
     function ObjectUnsubscribedErrorImpl() {
         Error.call(this);
@@ -811,6 +1900,30 @@ var AnonymousSubject = /*@__PURE__*/ (function (_super) {
     return AnonymousSubject;
 }(Subject));
 
+/** PURE_IMPORTS_START _Observable,_util_isScheduler,_operators_mergeAll,_fromArray PURE_IMPORTS_END */
+function merge() {
+    var observables = [];
+    for (var _i = 0; _i < arguments.length; _i++) {
+        observables[_i] = arguments[_i];
+    }
+    var concurrent = Number.POSITIVE_INFINITY;
+    var scheduler = null;
+    var last = observables[observables.length - 1];
+    if (isScheduler(last)) {
+        scheduler = observables.pop();
+        if (observables.length > 1 && typeof observables[observables.length - 1] === 'number') {
+            concurrent = observables.pop();
+        }
+    }
+    else if (typeof last === 'number') {
+        concurrent = observables.pop();
+    }
+    if (scheduler === null && observables.length === 1 && observables[0] instanceof Observable) {
+        return observables[0];
+    }
+    return mergeAll(concurrent)(fromArray(observables, scheduler));
+}
+
 /** PURE_IMPORTS_START tslib,_Subscriber PURE_IMPORTS_END */
 function refCount() {
     return function refCountOperatorFunction(source) {
@@ -953,420 +2066,40 @@ var ConnectableSubscriber = /*@__PURE__*/ (function (_super) {
     return ConnectableSubscriber;
 }(SubjectSubscriber));
 
-/** PURE_IMPORTS_START tslib,_Subject,_util_ObjectUnsubscribedError PURE_IMPORTS_END */
-var BehaviorSubject = /*@__PURE__*/ (function (_super) {
-    __extends(BehaviorSubject, _super);
-    function BehaviorSubject(_value) {
-        var _this = _super.call(this) || this;
-        _this._value = _value;
-        return _this;
-    }
-    Object.defineProperty(BehaviorSubject.prototype, "value", {
-        get: function () {
-            return this.getValue();
-        },
-        enumerable: true,
-        configurable: true
-    });
-    BehaviorSubject.prototype._subscribe = function (subscriber) {
-        var subscription = _super.prototype._subscribe.call(this, subscriber);
-        if (subscription && !subscription.closed) {
-            subscriber.next(this._value);
+/** PURE_IMPORTS_START _observable_ConnectableObservable PURE_IMPORTS_END */
+function multicast(subjectOrSubjectFactory, selector) {
+    return function multicastOperatorFunction(source) {
+        var subjectFactory;
+        if (typeof subjectOrSubjectFactory === 'function') {
+            subjectFactory = subjectOrSubjectFactory;
         }
+        else {
+            subjectFactory = function subjectFactory() {
+                return subjectOrSubjectFactory;
+            };
+        }
+        if (typeof selector === 'function') {
+            return source.lift(new MulticastOperator(subjectFactory, selector));
+        }
+        var connectable = Object.create(source, connectableObservableDescriptor);
+        connectable.source = source;
+        connectable.subjectFactory = subjectFactory;
+        return connectable;
+    };
+}
+var MulticastOperator = /*@__PURE__*/ (function () {
+    function MulticastOperator(subjectFactory, selector) {
+        this.subjectFactory = subjectFactory;
+        this.selector = selector;
+    }
+    MulticastOperator.prototype.call = function (subscriber, source) {
+        var selector = this.selector;
+        var subject = this.subjectFactory();
+        var subscription = selector(subject).subscribe(subscriber);
+        subscription.add(source.subscribe(subject));
         return subscription;
     };
-    BehaviorSubject.prototype.getValue = function () {
-        if (this.hasError) {
-            throw this.thrownError;
-        }
-        else if (this.closed) {
-            throw new ObjectUnsubscribedError();
-        }
-        else {
-            return this._value;
-        }
-    };
-    BehaviorSubject.prototype.next = function (value) {
-        _super.prototype.next.call(this, this._value = value);
-    };
-    return BehaviorSubject;
-}(Subject));
-
-/** PURE_IMPORTS_START tslib,_Subscription PURE_IMPORTS_END */
-var Action = /*@__PURE__*/ (function (_super) {
-    __extends(Action, _super);
-    function Action(scheduler, work) {
-        return _super.call(this) || this;
-    }
-    Action.prototype.schedule = function (state, delay) {
-        return this;
-    };
-    return Action;
-}(Subscription));
-
-/** PURE_IMPORTS_START tslib,_Action PURE_IMPORTS_END */
-var AsyncAction = /*@__PURE__*/ (function (_super) {
-    __extends(AsyncAction, _super);
-    function AsyncAction(scheduler, work) {
-        var _this = _super.call(this, scheduler, work) || this;
-        _this.scheduler = scheduler;
-        _this.work = work;
-        _this.pending = false;
-        return _this;
-    }
-    AsyncAction.prototype.schedule = function (state, delay) {
-        if (delay === void 0) {
-            delay = 0;
-        }
-        if (this.closed) {
-            return this;
-        }
-        this.state = state;
-        var id = this.id;
-        var scheduler = this.scheduler;
-        if (id != null) {
-            this.id = this.recycleAsyncId(scheduler, id, delay);
-        }
-        this.pending = true;
-        this.delay = delay;
-        this.id = this.id || this.requestAsyncId(scheduler, this.id, delay);
-        return this;
-    };
-    AsyncAction.prototype.requestAsyncId = function (scheduler, id, delay) {
-        if (delay === void 0) {
-            delay = 0;
-        }
-        return setInterval(scheduler.flush.bind(scheduler, this), delay);
-    };
-    AsyncAction.prototype.recycleAsyncId = function (scheduler, id, delay) {
-        if (delay === void 0) {
-            delay = 0;
-        }
-        if (delay !== null && this.delay === delay && this.pending === false) {
-            return id;
-        }
-        clearInterval(id);
-        return undefined;
-    };
-    AsyncAction.prototype.execute = function (state, delay) {
-        if (this.closed) {
-            return new Error('executing a cancelled action');
-        }
-        this.pending = false;
-        var error = this._execute(state, delay);
-        if (error) {
-            return error;
-        }
-        else if (this.pending === false && this.id != null) {
-            this.id = this.recycleAsyncId(this.scheduler, this.id, null);
-        }
-    };
-    AsyncAction.prototype._execute = function (state, delay) {
-        var errored = false;
-        var errorValue = undefined;
-        try {
-            this.work(state);
-        }
-        catch (e) {
-            errored = true;
-            errorValue = !!e && e || new Error(e);
-        }
-        if (errored) {
-            this.unsubscribe();
-            return errorValue;
-        }
-    };
-    AsyncAction.prototype._unsubscribe = function () {
-        var id = this.id;
-        var scheduler = this.scheduler;
-        var actions = scheduler.actions;
-        var index = actions.indexOf(this);
-        this.work = null;
-        this.state = null;
-        this.pending = false;
-        this.scheduler = null;
-        if (index !== -1) {
-            actions.splice(index, 1);
-        }
-        if (id != null) {
-            this.id = this.recycleAsyncId(scheduler, id, null);
-        }
-        this.delay = null;
-    };
-    return AsyncAction;
-}(Action));
-
-/** PURE_IMPORTS_START tslib,_AsyncAction PURE_IMPORTS_END */
-var QueueAction = /*@__PURE__*/ (function (_super) {
-    __extends(QueueAction, _super);
-    function QueueAction(scheduler, work) {
-        var _this = _super.call(this, scheduler, work) || this;
-        _this.scheduler = scheduler;
-        _this.work = work;
-        return _this;
-    }
-    QueueAction.prototype.schedule = function (state, delay) {
-        if (delay === void 0) {
-            delay = 0;
-        }
-        if (delay > 0) {
-            return _super.prototype.schedule.call(this, state, delay);
-        }
-        this.delay = delay;
-        this.state = state;
-        this.scheduler.flush(this);
-        return this;
-    };
-    QueueAction.prototype.execute = function (state, delay) {
-        return (delay > 0 || this.closed) ?
-            _super.prototype.execute.call(this, state, delay) :
-            this._execute(state, delay);
-    };
-    QueueAction.prototype.requestAsyncId = function (scheduler, id, delay) {
-        if (delay === void 0) {
-            delay = 0;
-        }
-        if ((delay !== null && delay > 0) || (delay === null && this.delay > 0)) {
-            return _super.prototype.requestAsyncId.call(this, scheduler, id, delay);
-        }
-        return scheduler.flush(this);
-    };
-    return QueueAction;
-}(AsyncAction));
-
-var Scheduler = /*@__PURE__*/ (function () {
-    function Scheduler(SchedulerAction, now) {
-        if (now === void 0) {
-            now = Scheduler.now;
-        }
-        this.SchedulerAction = SchedulerAction;
-        this.now = now;
-    }
-    Scheduler.prototype.schedule = function (work, delay, state) {
-        if (delay === void 0) {
-            delay = 0;
-        }
-        return new this.SchedulerAction(this, work).schedule(state, delay);
-    };
-    Scheduler.now = function () { return Date.now(); };
-    return Scheduler;
-}());
-
-/** PURE_IMPORTS_START tslib,_Scheduler PURE_IMPORTS_END */
-var AsyncScheduler = /*@__PURE__*/ (function (_super) {
-    __extends(AsyncScheduler, _super);
-    function AsyncScheduler(SchedulerAction, now) {
-        if (now === void 0) {
-            now = Scheduler.now;
-        }
-        var _this = _super.call(this, SchedulerAction, function () {
-            if (AsyncScheduler.delegate && AsyncScheduler.delegate !== _this) {
-                return AsyncScheduler.delegate.now();
-            }
-            else {
-                return now();
-            }
-        }) || this;
-        _this.actions = [];
-        _this.active = false;
-        _this.scheduled = undefined;
-        return _this;
-    }
-    AsyncScheduler.prototype.schedule = function (work, delay, state) {
-        if (delay === void 0) {
-            delay = 0;
-        }
-        if (AsyncScheduler.delegate && AsyncScheduler.delegate !== this) {
-            return AsyncScheduler.delegate.schedule(work, delay, state);
-        }
-        else {
-            return _super.prototype.schedule.call(this, work, delay, state);
-        }
-    };
-    AsyncScheduler.prototype.flush = function (action) {
-        var actions = this.actions;
-        if (this.active) {
-            actions.push(action);
-            return;
-        }
-        var error;
-        this.active = true;
-        do {
-            if (error = action.execute(action.state, action.delay)) {
-                break;
-            }
-        } while (action = actions.shift());
-        this.active = false;
-        if (error) {
-            while (action = actions.shift()) {
-                action.unsubscribe();
-            }
-            throw error;
-        }
-    };
-    return AsyncScheduler;
-}(Scheduler));
-
-/** PURE_IMPORTS_START tslib,_AsyncScheduler PURE_IMPORTS_END */
-var QueueScheduler = /*@__PURE__*/ (function (_super) {
-    __extends(QueueScheduler, _super);
-    function QueueScheduler() {
-        return _super !== null && _super.apply(this, arguments) || this;
-    }
-    return QueueScheduler;
-}(AsyncScheduler));
-
-/** PURE_IMPORTS_START _QueueAction,_QueueScheduler PURE_IMPORTS_END */
-var queueScheduler = /*@__PURE__*/ new QueueScheduler(QueueAction);
-var queue = queueScheduler;
-
-/** PURE_IMPORTS_START _Observable PURE_IMPORTS_END */
-var EMPTY = /*@__PURE__*/ new Observable(function (subscriber) { return subscriber.complete(); });
-function empty$1(scheduler) {
-    return scheduler ? emptyScheduled(scheduler) : EMPTY;
-}
-function emptyScheduled(scheduler) {
-    return new Observable(function (subscriber) { return scheduler.schedule(function () { return subscriber.complete(); }); });
-}
-
-/** PURE_IMPORTS_START  PURE_IMPORTS_END */
-function isScheduler(value) {
-    return value && typeof value.schedule === 'function';
-}
-
-/** PURE_IMPORTS_START  PURE_IMPORTS_END */
-var subscribeToArray = function (array) {
-    return function (subscriber) {
-        for (var i = 0, len = array.length; i < len && !subscriber.closed; i++) {
-            subscriber.next(array[i]);
-        }
-        subscriber.complete();
-    };
-};
-
-/** PURE_IMPORTS_START _Observable,_Subscription PURE_IMPORTS_END */
-function scheduleArray(input, scheduler) {
-    return new Observable(function (subscriber) {
-        var sub = new Subscription();
-        var i = 0;
-        sub.add(scheduler.schedule(function () {
-            if (i === input.length) {
-                subscriber.complete();
-                return;
-            }
-            subscriber.next(input[i++]);
-            if (!subscriber.closed) {
-                sub.add(this.schedule());
-            }
-        }));
-        return sub;
-    });
-}
-
-/** PURE_IMPORTS_START _Observable,_util_subscribeToArray,_scheduled_scheduleArray PURE_IMPORTS_END */
-function fromArray(input, scheduler) {
-    if (!scheduler) {
-        return new Observable(subscribeToArray(input));
-    }
-    else {
-        return scheduleArray(input, scheduler);
-    }
-}
-
-/** PURE_IMPORTS_START _util_isScheduler,_fromArray,_scheduled_scheduleArray PURE_IMPORTS_END */
-function of() {
-    var args = [];
-    for (var _i = 0; _i < arguments.length; _i++) {
-        args[_i] = arguments[_i];
-    }
-    var scheduler = args[args.length - 1];
-    if (isScheduler(scheduler)) {
-        args.pop();
-        return scheduleArray(args, scheduler);
-    }
-    else {
-        return fromArray(args);
-    }
-}
-
-/** PURE_IMPORTS_START _Observable PURE_IMPORTS_END */
-function throwError(error, scheduler) {
-    if (!scheduler) {
-        return new Observable(function (subscriber) { return subscriber.error(error); });
-    }
-    else {
-        return new Observable(function (subscriber) { return scheduler.schedule(dispatch, 0, { error: error, subscriber: subscriber }); });
-    }
-}
-function dispatch(_a) {
-    var error = _a.error, subscriber = _a.subscriber;
-    subscriber.error(error);
-}
-
-/** PURE_IMPORTS_START _observable_empty,_observable_of,_observable_throwError PURE_IMPORTS_END */
-var Notification = /*@__PURE__*/ (function () {
-    function Notification(kind, value, error) {
-        this.kind = kind;
-        this.value = value;
-        this.error = error;
-        this.hasValue = kind === 'N';
-    }
-    Notification.prototype.observe = function (observer) {
-        switch (this.kind) {
-            case 'N':
-                return observer.next && observer.next(this.value);
-            case 'E':
-                return observer.error && observer.error(this.error);
-            case 'C':
-                return observer.complete && observer.complete();
-        }
-    };
-    Notification.prototype.do = function (next, error, complete) {
-        var kind = this.kind;
-        switch (kind) {
-            case 'N':
-                return next && next(this.value);
-            case 'E':
-                return error && error(this.error);
-            case 'C':
-                return complete && complete();
-        }
-    };
-    Notification.prototype.accept = function (nextOrObserver, error, complete) {
-        if (nextOrObserver && typeof nextOrObserver.next === 'function') {
-            return this.observe(nextOrObserver);
-        }
-        else {
-            return this.do(nextOrObserver, error, complete);
-        }
-    };
-    Notification.prototype.toObservable = function () {
-        var kind = this.kind;
-        switch (kind) {
-            case 'N':
-                return of(this.value);
-            case 'E':
-                return throwError(this.error);
-            case 'C':
-                return empty$1();
-        }
-        throw new Error('unexpected notification kind value');
-    };
-    Notification.createNext = function (value) {
-        if (typeof value !== 'undefined') {
-            return new Notification('N', value);
-        }
-        return Notification.undefinedValueNotification;
-    };
-    Notification.createError = function (err) {
-        return new Notification('E', undefined, err);
-    };
-    Notification.createComplete = function () {
-        return Notification.completeNotification;
-    };
-    Notification.completeNotification = new Notification('C');
-    Notification.undefinedValueNotification = new Notification('N', undefined);
-    return Notification;
+    return MulticastOperator;
 }());
 
 /** PURE_IMPORTS_START tslib,_Subscriber,_Notification PURE_IMPORTS_END */
@@ -1410,6 +2143,96 @@ var ObserveOnMessage = /*@__PURE__*/ (function () {
     }
     return ObserveOnMessage;
 }());
+
+/** PURE_IMPORTS_START tslib,_Subject,_util_ObjectUnsubscribedError PURE_IMPORTS_END */
+var BehaviorSubject = /*@__PURE__*/ (function (_super) {
+    __extends(BehaviorSubject, _super);
+    function BehaviorSubject(_value) {
+        var _this = _super.call(this) || this;
+        _this._value = _value;
+        return _this;
+    }
+    Object.defineProperty(BehaviorSubject.prototype, "value", {
+        get: function () {
+            return this.getValue();
+        },
+        enumerable: true,
+        configurable: true
+    });
+    BehaviorSubject.prototype._subscribe = function (subscriber) {
+        var subscription = _super.prototype._subscribe.call(this, subscriber);
+        if (subscription && !subscription.closed) {
+            subscriber.next(this._value);
+        }
+        return subscription;
+    };
+    BehaviorSubject.prototype.getValue = function () {
+        if (this.hasError) {
+            throw this.thrownError;
+        }
+        else if (this.closed) {
+            throw new ObjectUnsubscribedError();
+        }
+        else {
+            return this._value;
+        }
+    };
+    BehaviorSubject.prototype.next = function (value) {
+        _super.prototype.next.call(this, this._value = value);
+    };
+    return BehaviorSubject;
+}(Subject));
+
+/** PURE_IMPORTS_START tslib,_AsyncAction PURE_IMPORTS_END */
+var QueueAction = /*@__PURE__*/ (function (_super) {
+    __extends(QueueAction, _super);
+    function QueueAction(scheduler, work) {
+        var _this = _super.call(this, scheduler, work) || this;
+        _this.scheduler = scheduler;
+        _this.work = work;
+        return _this;
+    }
+    QueueAction.prototype.schedule = function (state, delay) {
+        if (delay === void 0) {
+            delay = 0;
+        }
+        if (delay > 0) {
+            return _super.prototype.schedule.call(this, state, delay);
+        }
+        this.delay = delay;
+        this.state = state;
+        this.scheduler.flush(this);
+        return this;
+    };
+    QueueAction.prototype.execute = function (state, delay) {
+        return (delay > 0 || this.closed) ?
+            _super.prototype.execute.call(this, state, delay) :
+            this._execute(state, delay);
+    };
+    QueueAction.prototype.requestAsyncId = function (scheduler, id, delay) {
+        if (delay === void 0) {
+            delay = 0;
+        }
+        if ((delay !== null && delay > 0) || (delay === null && this.delay > 0)) {
+            return _super.prototype.requestAsyncId.call(this, scheduler, id, delay);
+        }
+        return scheduler.flush(this);
+    };
+    return QueueAction;
+}(AsyncAction));
+
+/** PURE_IMPORTS_START tslib,_AsyncScheduler PURE_IMPORTS_END */
+var QueueScheduler = /*@__PURE__*/ (function (_super) {
+    __extends(QueueScheduler, _super);
+    function QueueScheduler() {
+        return _super !== null && _super.apply(this, arguments) || this;
+    }
+    return QueueScheduler;
+}(AsyncScheduler));
+
+/** PURE_IMPORTS_START _QueueAction,_QueueScheduler PURE_IMPORTS_END */
+var queueScheduler = /*@__PURE__*/ new QueueScheduler(QueueAction);
+var queue = queueScheduler;
 
 /** PURE_IMPORTS_START tslib,_Subject,_scheduler_queue,_Subscription,_operators_observeOn,_util_ObjectUnsubscribedError,_SubjectSubscription PURE_IMPORTS_END */
 var ReplaySubject = /*@__PURE__*/ (function (_super) {
@@ -1522,868 +2345,6 @@ var ReplayEvent = /*@__PURE__*/ (function () {
         this.value = value;
     }
     return ReplayEvent;
-}());
-
-/** PURE_IMPORTS_START _AsyncAction,_AsyncScheduler PURE_IMPORTS_END */
-var asyncScheduler = /*@__PURE__*/ new AsyncScheduler(AsyncAction);
-var async = asyncScheduler;
-
-/** PURE_IMPORTS_START  PURE_IMPORTS_END */
-function noop() { }
-
-/** PURE_IMPORTS_START  PURE_IMPORTS_END */
-var ArgumentOutOfRangeErrorImpl = /*@__PURE__*/ (function () {
-    function ArgumentOutOfRangeErrorImpl() {
-        Error.call(this);
-        this.message = 'argument out of range';
-        this.name = 'ArgumentOutOfRangeError';
-        return this;
-    }
-    ArgumentOutOfRangeErrorImpl.prototype = /*@__PURE__*/ Object.create(Error.prototype);
-    return ArgumentOutOfRangeErrorImpl;
-})();
-var ArgumentOutOfRangeError = ArgumentOutOfRangeErrorImpl;
-
-/** PURE_IMPORTS_START tslib,_Subscriber PURE_IMPORTS_END */
-function map(project, thisArg) {
-    return function mapOperation(source) {
-        if (typeof project !== 'function') {
-            throw new TypeError('argument is not a function. Are you looking for `mapTo()`?');
-        }
-        return source.lift(new MapOperator(project, thisArg));
-    };
-}
-var MapOperator = /*@__PURE__*/ (function () {
-    function MapOperator(project, thisArg) {
-        this.project = project;
-        this.thisArg = thisArg;
-    }
-    MapOperator.prototype.call = function (subscriber, source) {
-        return source.subscribe(new MapSubscriber(subscriber, this.project, this.thisArg));
-    };
-    return MapOperator;
-}());
-var MapSubscriber = /*@__PURE__*/ (function (_super) {
-    __extends(MapSubscriber, _super);
-    function MapSubscriber(destination, project, thisArg) {
-        var _this = _super.call(this, destination) || this;
-        _this.project = project;
-        _this.count = 0;
-        _this.thisArg = thisArg || _this;
-        return _this;
-    }
-    MapSubscriber.prototype._next = function (value) {
-        var result;
-        try {
-            result = this.project.call(this.thisArg, value, this.count++);
-        }
-        catch (err) {
-            this.destination.error(err);
-            return;
-        }
-        this.destination.next(result);
-    };
-    return MapSubscriber;
-}(Subscriber));
-
-/** PURE_IMPORTS_START _hostReportError PURE_IMPORTS_END */
-var subscribeToPromise = function (promise) {
-    return function (subscriber) {
-        promise.then(function (value) {
-            if (!subscriber.closed) {
-                subscriber.next(value);
-                subscriber.complete();
-            }
-        }, function (err) { return subscriber.error(err); })
-            .then(null, hostReportError);
-        return subscriber;
-    };
-};
-
-/** PURE_IMPORTS_START  PURE_IMPORTS_END */
-function getSymbolIterator() {
-    if (typeof Symbol !== 'function' || !Symbol.iterator) {
-        return '@@iterator';
-    }
-    return Symbol.iterator;
-}
-var iterator = /*@__PURE__*/ getSymbolIterator();
-
-/** PURE_IMPORTS_START _symbol_iterator PURE_IMPORTS_END */
-var subscribeToIterable = function (iterable) {
-    return function (subscriber) {
-        var iterator$1 = iterable[iterator]();
-        do {
-            var item = void 0;
-            try {
-                item = iterator$1.next();
-            }
-            catch (err) {
-                subscriber.error(err);
-                return subscriber;
-            }
-            if (item.done) {
-                subscriber.complete();
-                break;
-            }
-            subscriber.next(item.value);
-            if (subscriber.closed) {
-                break;
-            }
-        } while (true);
-        if (typeof iterator$1.return === 'function') {
-            subscriber.add(function () {
-                if (iterator$1.return) {
-                    iterator$1.return();
-                }
-            });
-        }
-        return subscriber;
-    };
-};
-
-/** PURE_IMPORTS_START _symbol_observable PURE_IMPORTS_END */
-var subscribeToObservable = function (obj) {
-    return function (subscriber) {
-        var obs = obj[observable]();
-        if (typeof obs.subscribe !== 'function') {
-            throw new TypeError('Provided object does not correctly implement Symbol.observable');
-        }
-        else {
-            return obs.subscribe(subscriber);
-        }
-    };
-};
-
-/** PURE_IMPORTS_START  PURE_IMPORTS_END */
-var isArrayLike = (function (x) { return x && typeof x.length === 'number' && typeof x !== 'function'; });
-
-/** PURE_IMPORTS_START  PURE_IMPORTS_END */
-function isPromise(value) {
-    return !!value && typeof value.subscribe !== 'function' && typeof value.then === 'function';
-}
-
-/** PURE_IMPORTS_START _subscribeToArray,_subscribeToPromise,_subscribeToIterable,_subscribeToObservable,_isArrayLike,_isPromise,_isObject,_symbol_iterator,_symbol_observable PURE_IMPORTS_END */
-var subscribeTo = function (result) {
-    if (!!result && typeof result[observable] === 'function') {
-        return subscribeToObservable(result);
-    }
-    else if (isArrayLike(result)) {
-        return subscribeToArray(result);
-    }
-    else if (isPromise(result)) {
-        return subscribeToPromise(result);
-    }
-    else if (!!result && typeof result[iterator] === 'function') {
-        return subscribeToIterable(result);
-    }
-    else {
-        var value = isObject(result) ? 'an invalid object' : "'" + result + "'";
-        var msg = "You provided " + value + " where a stream was expected."
-            + ' You can provide an Observable, Promise, Array, or Iterable.';
-        throw new TypeError(msg);
-    }
-};
-
-/** PURE_IMPORTS_START _Observable,_Subscription,_symbol_observable PURE_IMPORTS_END */
-function scheduleObservable(input, scheduler) {
-    return new Observable(function (subscriber) {
-        var sub = new Subscription();
-        sub.add(scheduler.schedule(function () {
-            var observable$1 = input[observable]();
-            sub.add(observable$1.subscribe({
-                next: function (value) { sub.add(scheduler.schedule(function () { return subscriber.next(value); })); },
-                error: function (err) { sub.add(scheduler.schedule(function () { return subscriber.error(err); })); },
-                complete: function () { sub.add(scheduler.schedule(function () { return subscriber.complete(); })); },
-            }));
-        }));
-        return sub;
-    });
-}
-
-/** PURE_IMPORTS_START _Observable,_Subscription PURE_IMPORTS_END */
-function schedulePromise(input, scheduler) {
-    return new Observable(function (subscriber) {
-        var sub = new Subscription();
-        sub.add(scheduler.schedule(function () {
-            return input.then(function (value) {
-                sub.add(scheduler.schedule(function () {
-                    subscriber.next(value);
-                    sub.add(scheduler.schedule(function () { return subscriber.complete(); }));
-                }));
-            }, function (err) {
-                sub.add(scheduler.schedule(function () { return subscriber.error(err); }));
-            });
-        }));
-        return sub;
-    });
-}
-
-/** PURE_IMPORTS_START _Observable,_Subscription,_symbol_iterator PURE_IMPORTS_END */
-function scheduleIterable(input, scheduler) {
-    if (!input) {
-        throw new Error('Iterable cannot be null');
-    }
-    return new Observable(function (subscriber) {
-        var sub = new Subscription();
-        var iterator$1;
-        sub.add(function () {
-            if (iterator$1 && typeof iterator$1.return === 'function') {
-                iterator$1.return();
-            }
-        });
-        sub.add(scheduler.schedule(function () {
-            iterator$1 = input[iterator]();
-            sub.add(scheduler.schedule(function () {
-                if (subscriber.closed) {
-                    return;
-                }
-                var value;
-                var done;
-                try {
-                    var result = iterator$1.next();
-                    value = result.value;
-                    done = result.done;
-                }
-                catch (err) {
-                    subscriber.error(err);
-                    return;
-                }
-                if (done) {
-                    subscriber.complete();
-                }
-                else {
-                    subscriber.next(value);
-                    this.schedule();
-                }
-            }));
-        }));
-        return sub;
-    });
-}
-
-/** PURE_IMPORTS_START _symbol_observable PURE_IMPORTS_END */
-function isInteropObservable(input) {
-    return input && typeof input[observable] === 'function';
-}
-
-/** PURE_IMPORTS_START _symbol_iterator PURE_IMPORTS_END */
-function isIterable(input) {
-    return input && typeof input[iterator] === 'function';
-}
-
-/** PURE_IMPORTS_START _scheduleObservable,_schedulePromise,_scheduleArray,_scheduleIterable,_util_isInteropObservable,_util_isPromise,_util_isArrayLike,_util_isIterable PURE_IMPORTS_END */
-function scheduled(input, scheduler) {
-    if (input != null) {
-        if (isInteropObservable(input)) {
-            return scheduleObservable(input, scheduler);
-        }
-        else if (isPromise(input)) {
-            return schedulePromise(input, scheduler);
-        }
-        else if (isArrayLike(input)) {
-            return scheduleArray(input, scheduler);
-        }
-        else if (isIterable(input) || typeof input === 'string') {
-            return scheduleIterable(input, scheduler);
-        }
-    }
-    throw new TypeError((input !== null && typeof input || input) + ' is not observable');
-}
-
-/** PURE_IMPORTS_START _Observable,_util_subscribeTo,_scheduled_scheduled PURE_IMPORTS_END */
-function from(input, scheduler) {
-    if (!scheduler) {
-        if (input instanceof Observable) {
-            return input;
-        }
-        return new Observable(subscribeTo(input));
-    }
-    else {
-        return scheduled(input, scheduler);
-    }
-}
-
-/** PURE_IMPORTS_START tslib,_Subscriber,_Observable,_util_subscribeTo PURE_IMPORTS_END */
-var SimpleInnerSubscriber = /*@__PURE__*/ (function (_super) {
-    __extends(SimpleInnerSubscriber, _super);
-    function SimpleInnerSubscriber(parent) {
-        var _this = _super.call(this) || this;
-        _this.parent = parent;
-        return _this;
-    }
-    SimpleInnerSubscriber.prototype._next = function (value) {
-        this.parent.notifyNext(value);
-    };
-    SimpleInnerSubscriber.prototype._error = function (error) {
-        this.parent.notifyError(error);
-        this.unsubscribe();
-    };
-    SimpleInnerSubscriber.prototype._complete = function () {
-        this.parent.notifyComplete();
-        this.unsubscribe();
-    };
-    return SimpleInnerSubscriber;
-}(Subscriber));
-var SimpleOuterSubscriber = /*@__PURE__*/ (function (_super) {
-    __extends(SimpleOuterSubscriber, _super);
-    function SimpleOuterSubscriber() {
-        return _super !== null && _super.apply(this, arguments) || this;
-    }
-    SimpleOuterSubscriber.prototype.notifyNext = function (innerValue) {
-        this.destination.next(innerValue);
-    };
-    SimpleOuterSubscriber.prototype.notifyError = function (err) {
-        this.destination.error(err);
-    };
-    SimpleOuterSubscriber.prototype.notifyComplete = function () {
-        this.destination.complete();
-    };
-    return SimpleOuterSubscriber;
-}(Subscriber));
-function innerSubscribe(result, innerSubscriber) {
-    if (innerSubscriber.closed) {
-        return undefined;
-    }
-    if (result instanceof Observable) {
-        return result.subscribe(innerSubscriber);
-    }
-    return subscribeTo(result)(innerSubscriber);
-}
-
-/** PURE_IMPORTS_START tslib,_map,_observable_from,_innerSubscribe PURE_IMPORTS_END */
-function mergeMap(project, resultSelector, concurrent) {
-    if (concurrent === void 0) {
-        concurrent = Number.POSITIVE_INFINITY;
-    }
-    if (typeof resultSelector === 'function') {
-        return function (source) { return source.pipe(mergeMap(function (a, i) { return from(project(a, i)).pipe(map(function (b, ii) { return resultSelector(a, b, i, ii); })); }, concurrent)); };
-    }
-    else if (typeof resultSelector === 'number') {
-        concurrent = resultSelector;
-    }
-    return function (source) { return source.lift(new MergeMapOperator(project, concurrent)); };
-}
-var MergeMapOperator = /*@__PURE__*/ (function () {
-    function MergeMapOperator(project, concurrent) {
-        if (concurrent === void 0) {
-            concurrent = Number.POSITIVE_INFINITY;
-        }
-        this.project = project;
-        this.concurrent = concurrent;
-    }
-    MergeMapOperator.prototype.call = function (observer, source) {
-        return source.subscribe(new MergeMapSubscriber(observer, this.project, this.concurrent));
-    };
-    return MergeMapOperator;
-}());
-var MergeMapSubscriber = /*@__PURE__*/ (function (_super) {
-    __extends(MergeMapSubscriber, _super);
-    function MergeMapSubscriber(destination, project, concurrent) {
-        if (concurrent === void 0) {
-            concurrent = Number.POSITIVE_INFINITY;
-        }
-        var _this = _super.call(this, destination) || this;
-        _this.project = project;
-        _this.concurrent = concurrent;
-        _this.hasCompleted = false;
-        _this.buffer = [];
-        _this.active = 0;
-        _this.index = 0;
-        return _this;
-    }
-    MergeMapSubscriber.prototype._next = function (value) {
-        if (this.active < this.concurrent) {
-            this._tryNext(value);
-        }
-        else {
-            this.buffer.push(value);
-        }
-    };
-    MergeMapSubscriber.prototype._tryNext = function (value) {
-        var result;
-        var index = this.index++;
-        try {
-            result = this.project(value, index);
-        }
-        catch (err) {
-            this.destination.error(err);
-            return;
-        }
-        this.active++;
-        this._innerSub(result);
-    };
-    MergeMapSubscriber.prototype._innerSub = function (ish) {
-        var innerSubscriber = new SimpleInnerSubscriber(this);
-        var destination = this.destination;
-        destination.add(innerSubscriber);
-        var innerSubscription = innerSubscribe(ish, innerSubscriber);
-        if (innerSubscription !== innerSubscriber) {
-            destination.add(innerSubscription);
-        }
-    };
-    MergeMapSubscriber.prototype._complete = function () {
-        this.hasCompleted = true;
-        if (this.active === 0 && this.buffer.length === 0) {
-            this.destination.complete();
-        }
-        this.unsubscribe();
-    };
-    MergeMapSubscriber.prototype.notifyNext = function (innerValue) {
-        this.destination.next(innerValue);
-    };
-    MergeMapSubscriber.prototype.notifyComplete = function () {
-        var buffer = this.buffer;
-        this.active--;
-        if (buffer.length > 0) {
-            this._next(buffer.shift());
-        }
-        else if (this.active === 0 && this.hasCompleted) {
-            this.destination.complete();
-        }
-    };
-    return MergeMapSubscriber;
-}(SimpleOuterSubscriber));
-
-/** PURE_IMPORTS_START _mergeMap,_util_identity PURE_IMPORTS_END */
-function mergeAll(concurrent) {
-    if (concurrent === void 0) {
-        concurrent = Number.POSITIVE_INFINITY;
-    }
-    return mergeMap(identity, concurrent);
-}
-
-/** PURE_IMPORTS_START _mergeAll PURE_IMPORTS_END */
-function concatAll() {
-    return mergeAll(1);
-}
-
-/** PURE_IMPORTS_START _of,_operators_concatAll PURE_IMPORTS_END */
-function concat() {
-    var observables = [];
-    for (var _i = 0; _i < arguments.length; _i++) {
-        observables[_i] = arguments[_i];
-    }
-    return concatAll()(of.apply(void 0, observables));
-}
-
-/** PURE_IMPORTS_START _Observable,_util_isArray,_util_isFunction,_operators_map PURE_IMPORTS_END */
-function fromEvent(target, eventName, options, resultSelector) {
-    if (isFunction(options)) {
-        resultSelector = options;
-        options = undefined;
-    }
-    if (resultSelector) {
-        return fromEvent(target, eventName, options).pipe(map(function (args) { return isArray(args) ? resultSelector.apply(void 0, args) : resultSelector(args); }));
-    }
-    return new Observable(function (subscriber) {
-        function handler(e) {
-            if (arguments.length > 1) {
-                subscriber.next(Array.prototype.slice.call(arguments));
-            }
-            else {
-                subscriber.next(e);
-            }
-        }
-        setupSubscription(target, eventName, handler, subscriber, options);
-    });
-}
-function setupSubscription(sourceObj, eventName, handler, subscriber, options) {
-    var unsubscribe;
-    if (isEventTarget(sourceObj)) {
-        var source_1 = sourceObj;
-        sourceObj.addEventListener(eventName, handler, options);
-        unsubscribe = function () { return source_1.removeEventListener(eventName, handler, options); };
-    }
-    else if (isJQueryStyleEventEmitter(sourceObj)) {
-        var source_2 = sourceObj;
-        sourceObj.on(eventName, handler);
-        unsubscribe = function () { return source_2.off(eventName, handler); };
-    }
-    else if (isNodeStyleEventEmitter(sourceObj)) {
-        var source_3 = sourceObj;
-        sourceObj.addListener(eventName, handler);
-        unsubscribe = function () { return source_3.removeListener(eventName, handler); };
-    }
-    else if (sourceObj && sourceObj.length) {
-        for (var i = 0, len = sourceObj.length; i < len; i++) {
-            setupSubscription(sourceObj[i], eventName, handler, subscriber, options);
-        }
-    }
-    else {
-        throw new TypeError('Invalid event target');
-    }
-    subscriber.add(unsubscribe);
-}
-function isNodeStyleEventEmitter(sourceObj) {
-    return sourceObj && typeof sourceObj.addListener === 'function' && typeof sourceObj.removeListener === 'function';
-}
-function isJQueryStyleEventEmitter(sourceObj) {
-    return sourceObj && typeof sourceObj.on === 'function' && typeof sourceObj.off === 'function';
-}
-function isEventTarget(sourceObj) {
-    return sourceObj && typeof sourceObj.addEventListener === 'function' && typeof sourceObj.removeEventListener === 'function';
-}
-
-/** PURE_IMPORTS_START _Observable,_util_isScheduler,_operators_mergeAll,_fromArray PURE_IMPORTS_END */
-function merge() {
-    var observables = [];
-    for (var _i = 0; _i < arguments.length; _i++) {
-        observables[_i] = arguments[_i];
-    }
-    var concurrent = Number.POSITIVE_INFINITY;
-    var scheduler = null;
-    var last = observables[observables.length - 1];
-    if (isScheduler(last)) {
-        scheduler = observables.pop();
-        if (observables.length > 1 && typeof observables[observables.length - 1] === 'number') {
-            concurrent = observables.pop();
-        }
-    }
-    else if (typeof last === 'number') {
-        concurrent = observables.pop();
-    }
-    if (scheduler === null && observables.length === 1 && observables[0] instanceof Observable) {
-        return observables[0];
-    }
-    return mergeAll(concurrent)(fromArray(observables, scheduler));
-}
-
-/** PURE_IMPORTS_START _Observable,_util_noop PURE_IMPORTS_END */
-var NEVER = /*@__PURE__*/ new Observable(noop);
-
-/** PURE_IMPORTS_START tslib,_Subscriber PURE_IMPORTS_END */
-function filter(predicate, thisArg) {
-    return function filterOperatorFunction(source) {
-        return source.lift(new FilterOperator(predicate, thisArg));
-    };
-}
-var FilterOperator = /*@__PURE__*/ (function () {
-    function FilterOperator(predicate, thisArg) {
-        this.predicate = predicate;
-        this.thisArg = thisArg;
-    }
-    FilterOperator.prototype.call = function (subscriber, source) {
-        return source.subscribe(new FilterSubscriber(subscriber, this.predicate, this.thisArg));
-    };
-    return FilterOperator;
-}());
-var FilterSubscriber = /*@__PURE__*/ (function (_super) {
-    __extends(FilterSubscriber, _super);
-    function FilterSubscriber(destination, predicate, thisArg) {
-        var _this = _super.call(this, destination) || this;
-        _this.predicate = predicate;
-        _this.thisArg = thisArg;
-        _this.count = 0;
-        return _this;
-    }
-    FilterSubscriber.prototype._next = function (value) {
-        var result;
-        try {
-            result = this.predicate.call(this.thisArg, value, this.count++);
-        }
-        catch (err) {
-            this.destination.error(err);
-            return;
-        }
-        if (result) {
-            this.destination.next(value);
-        }
-    };
-    return FilterSubscriber;
-}(Subscriber));
-
-/** PURE_IMPORTS_START tslib,_Subscriber,_scheduler_async PURE_IMPORTS_END */
-function debounceTime(dueTime, scheduler) {
-    if (scheduler === void 0) {
-        scheduler = async;
-    }
-    return function (source) { return source.lift(new DebounceTimeOperator(dueTime, scheduler)); };
-}
-var DebounceTimeOperator = /*@__PURE__*/ (function () {
-    function DebounceTimeOperator(dueTime, scheduler) {
-        this.dueTime = dueTime;
-        this.scheduler = scheduler;
-    }
-    DebounceTimeOperator.prototype.call = function (subscriber, source) {
-        return source.subscribe(new DebounceTimeSubscriber(subscriber, this.dueTime, this.scheduler));
-    };
-    return DebounceTimeOperator;
-}());
-var DebounceTimeSubscriber = /*@__PURE__*/ (function (_super) {
-    __extends(DebounceTimeSubscriber, _super);
-    function DebounceTimeSubscriber(destination, dueTime, scheduler) {
-        var _this = _super.call(this, destination) || this;
-        _this.dueTime = dueTime;
-        _this.scheduler = scheduler;
-        _this.debouncedSubscription = null;
-        _this.lastValue = null;
-        _this.hasValue = false;
-        return _this;
-    }
-    DebounceTimeSubscriber.prototype._next = function (value) {
-        this.clearDebounce();
-        this.lastValue = value;
-        this.hasValue = true;
-        this.add(this.debouncedSubscription = this.scheduler.schedule(dispatchNext, this.dueTime, this));
-    };
-    DebounceTimeSubscriber.prototype._complete = function () {
-        this.debouncedNext();
-        this.destination.complete();
-    };
-    DebounceTimeSubscriber.prototype.debouncedNext = function () {
-        this.clearDebounce();
-        if (this.hasValue) {
-            var lastValue = this.lastValue;
-            this.lastValue = null;
-            this.hasValue = false;
-            this.destination.next(lastValue);
-        }
-    };
-    DebounceTimeSubscriber.prototype.clearDebounce = function () {
-        var debouncedSubscription = this.debouncedSubscription;
-        if (debouncedSubscription !== null) {
-            this.remove(debouncedSubscription);
-            debouncedSubscription.unsubscribe();
-            this.debouncedSubscription = null;
-        }
-    };
-    return DebounceTimeSubscriber;
-}(Subscriber));
-function dispatchNext(subscriber) {
-    subscriber.debouncedNext();
-}
-
-/** PURE_IMPORTS_START  PURE_IMPORTS_END */
-function isDate(value) {
-    return value instanceof Date && !isNaN(+value);
-}
-
-/** PURE_IMPORTS_START tslib,_scheduler_async,_util_isDate,_Subscriber,_Notification PURE_IMPORTS_END */
-function delay(delay, scheduler) {
-    if (scheduler === void 0) {
-        scheduler = async;
-    }
-    var absoluteDelay = isDate(delay);
-    var delayFor = absoluteDelay ? (+delay - scheduler.now()) : Math.abs(delay);
-    return function (source) { return source.lift(new DelayOperator(delayFor, scheduler)); };
-}
-var DelayOperator = /*@__PURE__*/ (function () {
-    function DelayOperator(delay, scheduler) {
-        this.delay = delay;
-        this.scheduler = scheduler;
-    }
-    DelayOperator.prototype.call = function (subscriber, source) {
-        return source.subscribe(new DelaySubscriber(subscriber, this.delay, this.scheduler));
-    };
-    return DelayOperator;
-}());
-var DelaySubscriber = /*@__PURE__*/ (function (_super) {
-    __extends(DelaySubscriber, _super);
-    function DelaySubscriber(destination, delay, scheduler) {
-        var _this = _super.call(this, destination) || this;
-        _this.delay = delay;
-        _this.scheduler = scheduler;
-        _this.queue = [];
-        _this.active = false;
-        _this.errored = false;
-        return _this;
-    }
-    DelaySubscriber.dispatch = function (state) {
-        var source = state.source;
-        var queue = source.queue;
-        var scheduler = state.scheduler;
-        var destination = state.destination;
-        while (queue.length > 0 && (queue[0].time - scheduler.now()) <= 0) {
-            queue.shift().notification.observe(destination);
-        }
-        if (queue.length > 0) {
-            var delay_1 = Math.max(0, queue[0].time - scheduler.now());
-            this.schedule(state, delay_1);
-        }
-        else {
-            this.unsubscribe();
-            source.active = false;
-        }
-    };
-    DelaySubscriber.prototype._schedule = function (scheduler) {
-        this.active = true;
-        var destination = this.destination;
-        destination.add(scheduler.schedule(DelaySubscriber.dispatch, this.delay, {
-            source: this, destination: this.destination, scheduler: scheduler
-        }));
-    };
-    DelaySubscriber.prototype.scheduleNotification = function (notification) {
-        if (this.errored === true) {
-            return;
-        }
-        var scheduler = this.scheduler;
-        var message = new DelayMessage(scheduler.now() + this.delay, notification);
-        this.queue.push(message);
-        if (this.active === false) {
-            this._schedule(scheduler);
-        }
-    };
-    DelaySubscriber.prototype._next = function (value) {
-        this.scheduleNotification(Notification.createNext(value));
-    };
-    DelaySubscriber.prototype._error = function (err) {
-        this.errored = true;
-        this.queue = [];
-        this.destination.error(err);
-        this.unsubscribe();
-    };
-    DelaySubscriber.prototype._complete = function () {
-        this.scheduleNotification(Notification.createComplete());
-        this.unsubscribe();
-    };
-    return DelaySubscriber;
-}(Subscriber));
-var DelayMessage = /*@__PURE__*/ (function () {
-    function DelayMessage(time, notification) {
-        this.time = time;
-        this.notification = notification;
-    }
-    return DelayMessage;
-}());
-
-/** PURE_IMPORTS_START tslib,_Subscriber PURE_IMPORTS_END */
-function distinctUntilChanged(compare, keySelector) {
-    return function (source) { return source.lift(new DistinctUntilChangedOperator(compare, keySelector)); };
-}
-var DistinctUntilChangedOperator = /*@__PURE__*/ (function () {
-    function DistinctUntilChangedOperator(compare, keySelector) {
-        this.compare = compare;
-        this.keySelector = keySelector;
-    }
-    DistinctUntilChangedOperator.prototype.call = function (subscriber, source) {
-        return source.subscribe(new DistinctUntilChangedSubscriber(subscriber, this.compare, this.keySelector));
-    };
-    return DistinctUntilChangedOperator;
-}());
-var DistinctUntilChangedSubscriber = /*@__PURE__*/ (function (_super) {
-    __extends(DistinctUntilChangedSubscriber, _super);
-    function DistinctUntilChangedSubscriber(destination, compare, keySelector) {
-        var _this = _super.call(this, destination) || this;
-        _this.keySelector = keySelector;
-        _this.hasKey = false;
-        if (typeof compare === 'function') {
-            _this.compare = compare;
-        }
-        return _this;
-    }
-    DistinctUntilChangedSubscriber.prototype.compare = function (x, y) {
-        return x === y;
-    };
-    DistinctUntilChangedSubscriber.prototype._next = function (value) {
-        var key;
-        try {
-            var keySelector = this.keySelector;
-            key = keySelector ? keySelector(value) : value;
-        }
-        catch (err) {
-            return this.destination.error(err);
-        }
-        var result = false;
-        if (this.hasKey) {
-            try {
-                var compare = this.compare;
-                result = compare(this.key, key);
-            }
-            catch (err) {
-                return this.destination.error(err);
-            }
-        }
-        else {
-            this.hasKey = true;
-        }
-        if (!result) {
-            this.key = key;
-            this.destination.next(value);
-        }
-    };
-    return DistinctUntilChangedSubscriber;
-}(Subscriber));
-
-/** PURE_IMPORTS_START tslib,_Subscriber,_util_ArgumentOutOfRangeError,_observable_empty PURE_IMPORTS_END */
-function take(count) {
-    return function (source) {
-        if (count === 0) {
-            return empty$1();
-        }
-        else {
-            return source.lift(new TakeOperator(count));
-        }
-    };
-}
-var TakeOperator = /*@__PURE__*/ (function () {
-    function TakeOperator(total) {
-        this.total = total;
-        if (this.total < 0) {
-            throw new ArgumentOutOfRangeError;
-        }
-    }
-    TakeOperator.prototype.call = function (subscriber, source) {
-        return source.subscribe(new TakeSubscriber(subscriber, this.total));
-    };
-    return TakeOperator;
-}());
-var TakeSubscriber = /*@__PURE__*/ (function (_super) {
-    __extends(TakeSubscriber, _super);
-    function TakeSubscriber(destination, total) {
-        var _this = _super.call(this, destination) || this;
-        _this.total = total;
-        _this.count = 0;
-        return _this;
-    }
-    TakeSubscriber.prototype._next = function (value) {
-        var total = this.total;
-        var count = ++this.count;
-        if (count <= total) {
-            this.destination.next(value);
-            if (count === total) {
-                this.destination.complete();
-                this.unsubscribe();
-            }
-        }
-    };
-    return TakeSubscriber;
-}(Subscriber));
-
-/** PURE_IMPORTS_START _observable_ConnectableObservable PURE_IMPORTS_END */
-function multicast(subjectOrSubjectFactory, selector) {
-    return function multicastOperatorFunction(source) {
-        var subjectFactory;
-        if (typeof subjectOrSubjectFactory === 'function') {
-            subjectFactory = subjectOrSubjectFactory;
-        }
-        else {
-            subjectFactory = function subjectFactory() {
-                return subjectOrSubjectFactory;
-            };
-        }
-        if (typeof selector === 'function') {
-            return source.lift(new MulticastOperator(subjectFactory, selector));
-        }
-        var connectable = Object.create(source, connectableObservableDescriptor);
-        connectable.source = source;
-        connectable.subjectFactory = subjectFactory;
-        return connectable;
-    };
-}
-var MulticastOperator = /*@__PURE__*/ (function () {
-    function MulticastOperator(subjectFactory, selector) {
-        this.subjectFactory = subjectFactory;
-        this.selector = selector;
-    }
-    MulticastOperator.prototype.call = function (subscriber, source) {
-        var selector = this.selector;
-        var subject = this.subjectFactory();
-        var subscription = selector(subject).subscribe(subscriber);
-        subscription.add(source.subscribe(subject));
-        return subscription;
-    };
-    return MulticastOperator;
 }());
 
 /** PURE_IMPORTS_START _multicast,_refCount,_Subject PURE_IMPORTS_END */
@@ -2623,6 +2584,9 @@ var TakeWhileSubscriber = /*@__PURE__*/ (function (_super) {
     return TakeWhileSubscriber;
 }(Subscriber));
 
+/** PURE_IMPORTS_START  PURE_IMPORTS_END */
+function noop() { }
+
 /** PURE_IMPORTS_START tslib,_Subscriber,_util_noop,_util_isFunction PURE_IMPORTS_END */
 function tap(nextOrObserver, error, complete) {
     return function tapOperatorFunction(source) {
@@ -2693,31 +2657,6 @@ var TapSubscriber = /*@__PURE__*/ (function (_super) {
     };
     return TapSubscriber;
 }(Subscriber));
-
-/*! *****************************************************************************
-Copyright (c) Microsoft Corporation.
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-***************************************************************************** */
-
-function __awaiter(thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-}
 
 var top = 'top';
 var bottom = 'bottom';
@@ -4550,43 +4489,272 @@ var offset$1 = {
   fn: offset
 };
 
-/**
- * Caches form controls so they are not initialized again.
- * Note: Declared in misc.ts so it's available in both input and validation.
- */
-const cachedControlsAndGroups = [];
-function isNullOrWhitespace(searchTerm) {
-    return searchTerm == null || (/\S/.test(searchTerm)) === false;
+/** PURE_IMPORTS_START _Observable,_util_isArray,_util_isFunction,_operators_map PURE_IMPORTS_END */
+function fromEvent(target, eventName, options, resultSelector) {
+    if (isFunction(options)) {
+        resultSelector = options;
+        options = undefined;
+    }
+    if (resultSelector) {
+        return fromEvent(target, eventName, options).pipe(map(function (args) { return isArray(args) ? resultSelector.apply(void 0, args) : resultSelector(args); }));
+    }
+    return new Observable(function (subscriber) {
+        function handler(e) {
+            if (arguments.length > 1) {
+                subscriber.next(Array.prototype.slice.call(arguments));
+            }
+            else {
+                subscriber.next(e);
+            }
+        }
+        setupSubscription(target, eventName, handler, subscriber, options);
+    });
 }
+function setupSubscription(sourceObj, eventName, handler, subscriber, options) {
+    var unsubscribe;
+    if (isEventTarget(sourceObj)) {
+        var source_1 = sourceObj;
+        sourceObj.addEventListener(eventName, handler, options);
+        unsubscribe = function () { return source_1.removeEventListener(eventName, handler, options); };
+    }
+    else if (isJQueryStyleEventEmitter(sourceObj)) {
+        var source_2 = sourceObj;
+        sourceObj.on(eventName, handler);
+        unsubscribe = function () { return source_2.off(eventName, handler); };
+    }
+    else if (isNodeStyleEventEmitter(sourceObj)) {
+        var source_3 = sourceObj;
+        sourceObj.addListener(eventName, handler);
+        unsubscribe = function () { return source_3.removeListener(eventName, handler); };
+    }
+    else if (sourceObj && sourceObj.length) {
+        for (var i = 0, len = sourceObj.length; i < len; i++) {
+            setupSubscription(sourceObj[i], eventName, handler, subscriber, options);
+        }
+    }
+    else {
+        throw new TypeError('Invalid event target');
+    }
+    subscriber.add(unsubscribe);
+}
+function isNodeStyleEventEmitter(sourceObj) {
+    return sourceObj && typeof sourceObj.addListener === 'function' && typeof sourceObj.removeListener === 'function';
+}
+function isJQueryStyleEventEmitter(sourceObj) {
+    return sourceObj && typeof sourceObj.on === 'function' && typeof sourceObj.off === 'function';
+}
+function isEventTarget(sourceObj) {
+    return sourceObj && typeof sourceObj.addEventListener === 'function' && typeof sourceObj.removeEventListener === 'function';
+}
+
 /*========================== Input functionality ==========================*/
-function extractRadioGroups(jQueryObject) {
-    let radioFields = (jQueryObject[0] instanceof HTMLFormElement ? jQueryObject.find('input') : jQueryObject).toArray().filter(element => element.getAttribute('type') === 'radio');
-    let radioGroups = radioFields.reduce((acc, curr) => {
-        if (acc[curr.getAttribute('name')])
-            acc[curr.getAttribute('name')].push(curr);
-        else
-            acc[curr.getAttribute('name')] = [curr];
-        return acc;
-    }, {});
-    return radioGroups;
+/**
+ * Returns true if it's either HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, or has the `formControl` attribute.
+ */
+function isValidFormControl(htmlElement) {
+    return (htmlElement instanceof HTMLElement) && (htmlElement instanceof HTMLInputElement || htmlElement instanceof HTMLSelectElement || htmlElement instanceof HTMLTextAreaElement
+        || htmlElement.getAttribute('formControl') != null);
+}
+/**
+ * Finds form controls in the subtree of the element.
+ * @param element Html element to check along with its descendants.
+ * @param onlyActive Find only elements that are currently used as controls.
+ */
+function findFormControls(element, onlyActive = false) {
+    let controlSelector = onlyActive ? '[formControl]' : 'input, select, textarea, [formControl]';
+    return element.matches(controlSelector)
+        ? [element]
+        : element.hasAttribute('formControl-shadow-root')
+            ? [...element.shadowRoot.children].filter(child => !(child instanceof HTMLStyleElement)).flatMap(e => findFormControls(e, onlyActive))
+            : [...element.querySelectorAll(controlSelector),
+                ...[...element.querySelectorAll('[formControl-shadow-root]')].flatMap(shadowHost => findFormControls(shadowHost))];
+}
+/**
+ * Creates form controls from the provided elements.
+ * Radio and checkbox elements with the same name are grouped into a single form control.
+ *
+ * @param controls Html elements to combine into controls.
+ * @returns Array of combined controls or 'false' in cases when the provided elements all belong to a single control.
+ * This prevents infinite loop when this function is used by the overridden jQuery constructor.
+ */
+function combineControls(controls) {
+    let checkboxElements = getCheckboxElements(controls);
+    if (checkIfRadioControl(controls) || checkIfCheckboxControl(controls))
+        return false;
+    return controls
+        .filter(element => element.getAttribute('type') !== 'radio' && checkboxElements.includes(element) === false)
+        .map(element => $(element))
+        .concat(combineRadiosAndCheckboxes(controls).map(controlElements => $(controlElements)));
 }
 /**
  * Returns true if the provided object has selected only the radio elements with the same name.
  * @param jQueryObject
  */
-function checkIfRadioGroup(jQueryObject) {
-    let selectedFormControls = Array.isArray(jQueryObject)
+function checkIfRadioControl(jQueryObject) {
+    let controls = Array.isArray(jQueryObject)
         ? jQueryObject
-        : (jQueryObject[0] instanceof HTMLFormElement ? (jQueryObject).find('input') : jQueryObject).toArray().filter(htmlElement => isFormControlType(htmlElement));
-    return selectedFormControls.length === 0
+        : (jQueryObject[0] instanceof HTMLFormElement ? (jQueryObject).find('input') : jQueryObject).toArray().filter(htmlElement => isValidFormControl(htmlElement));
+    return controls.length === 0
         ? false
-        : selectedFormControls.every(element => element.getAttribute('type') === 'radio' && element.getAttribute('name') === selectedFormControls[0].getAttribute('name'));
+        : controls.every(element => element.getAttribute('type') === 'radio' && element.getAttribute('name') === controls[0].getAttribute('name'));
 }
 /**
- * Returns true if it's either HTMLInputElement | HTMLSelectElement | HTMLAreaElement.
+ * Returns true if one of the element is type 'checkbox' and other is type 'hidden'. And with the same name.
+ * @param jQueryObject
  */
-function isFormControlType(htmlElement) {
-    return htmlElement instanceof HTMLInputElement || htmlElement instanceof HTMLSelectElement || htmlElement instanceof HTMLAreaElement;
+function checkIfCheckboxControl(jQueryObject) {
+    let controls = Array.isArray(jQueryObject)
+        ? jQueryObject
+        : (jQueryObject[0] instanceof HTMLFormElement ? (jQueryObject).find('input') : jQueryObject).toArray().filter(htmlElement => isValidFormControl(htmlElement));
+    return controls.length === 1 && controls[0].getAttribute('type') === 'checkbox'
+        || controls.length === 2 && controls[0].getAttribute('name') === controls[1].getAttribute('name')
+            && controls.some(element => element.getAttribute('type') === 'checkbox') && controls.some(element => element.getAttribute('type') === 'hidden');
+}
+function getCheckboxElements(formControls) {
+    let checkboxElements = formControls.filter(e => e.getAttribute('type') === 'checkbox');
+    checkboxElements = [...checkboxElements,
+        ...formControls.filter(e => e.getAttribute('type') === 'hidden' && checkboxElements.some(c => c.getAttribute('name') === e.getAttribute('name')))];
+    return checkboxElements;
+}
+/**
+ * Find radio and checkbox inputs and combines those with the same name into an array.
+ * @param formControls Array of html elements of any type.
+ * @returns Array of those arrays of combined elements.
+ */
+function combineRadiosAndCheckboxes(formControls) {
+    let checkboxElements = getCheckboxElements(formControls);
+    let targetFields = [...checkboxElements, ...formControls.filter(element => element.getAttribute('type') === 'radio')];
+    let targetGroups = targetFields.reduce((acc, curr) => {
+        let name = curr.getAttribute('name');
+        acc[name] ? acc[name].push(curr) : (acc[name] = [curr]);
+        return acc;
+    }, {});
+    return Object.values(targetGroups);
+}
+/**
+ * If checked, returns input's value, otherwise returns hidden namesake's value.
+ */
+function getCheckboxValue(jQueryObject) {
+    var _a;
+    let controls = jQueryObject.toArray();
+    let checkboxInput = controls.find(c => c.getAttribute('type') === 'checkbox');
+    let hiddenInput = controls.find(c => c.getAttribute('type') === 'hidden');
+    return checkboxInput.checked ? checkboxInput.value : (_a = hiddenInput === null || hiddenInput === void 0 ? void 0 : hiddenInput.value) !== null && _a !== void 0 ? _a : '';
+}
+/**
+ * If any radio is checked returns its value, otherwise null;
+ */
+function getRadioValue(jQueryObject) {
+    var _a;
+    let controls = jQueryObject.toArray();
+    let checkedRadio = controls.find(c => c.checked);
+    return (_a = checkedRadio === null || checkedRadio === void 0 ? void 0 : checkedRadio.value) !== null && _a !== void 0 ? _a : '';
+}
+/**
+ * Converts array of form data to json.
+ * @param nonIndexedArray Array of name-value pairs.
+ */
+function convertArrayToJson(nonIndexedArray) {
+    let indexed_array = {};
+    // Regex which captures index value
+    let arrayRx = /\[(\d+)\]$/;
+    for (let n of nonIndexedArray) {
+        let name = n['name'];
+        if (name.includes('.') === false) {
+            indexed_array[name] = n['value'];
+            continue;
+        }
+        let property = name.split('.')[name.split('.').length - 1];
+        let parents = name.split('.').slice(0, name.split('.').length - 1);
+        // Handle MVC Index property
+        if (property === 'Index')
+            continue;
+        let nestedProperty = indexed_array;
+        let previousParentIndex = null; // <-- not null if previous parent was an array
+        for (let parent of parents) {
+            let parentIsArray = arrayRx.test(parent);
+            let arrayIndex = null;
+            if (parentIsArray) {
+                arrayIndex = +parent.match(arrayRx)[1];
+                parent = parent.replace(arrayRx, '');
+            }
+            // If null, create a new object or an array
+            if ((previousParentIndex === null ? nestedProperty[parent] : nestedProperty[previousParentIndex][parent]) == null) {
+                if (previousParentIndex === null)
+                    nestedProperty[parent] = parentIsArray ? [] : {};
+                else
+                    nestedProperty[previousParentIndex][parent] = parentIsArray ? [] : {};
+            }
+            nestedProperty = previousParentIndex === null ? nestedProperty[parent] : nestedProperty[previousParentIndex][parent];
+            previousParentIndex = parentIsArray ? arrayIndex : null;
+        }
+        if (previousParentIndex === null)
+            nestedProperty[property] = n['value'];
+        else {
+            if (nestedProperty[previousParentIndex] == null)
+                nestedProperty[previousParentIndex] = {};
+            nestedProperty[previousParentIndex][property] = n['value'];
+        }
+    }
+    return removeEmptyArrayElements(indexed_array);
+}
+/**
+ * Removes null / empty elements from the object elements.
+ * Useful when creating json representation of the form, since its arrays' elements might not be in sequence.
+ */
+function removeEmptyArrayElements(object) {
+    if (object instanceof Object) {
+        for (let entry of Object.entries(object)) {
+            let key = entry[0];
+            let value = entry[1];
+            if (value instanceof Array)
+                object[key] = value.filter(e => e != null).map(e => removeEmptyArrayElements(e));
+            else if (value instanceof Object)
+                object[key] = removeEmptyArrayElements(value);
+        }
+    }
+    else if (object instanceof Array) {
+        object = object.filter(e => e != null).map(e => removeEmptyArrayElements(e));
+    }
+    return object;
+}
+/*========================== Cache ==========================*/
+/**
+ * Caches form controls so they are not initialized again.
+ * Note: Declared in misc.ts so it's available in both input and validation.
+ */
+const cachedControlsAndGroups = [];
+/**
+ * Finds the cached version of the form control / group and returns it, otherwise returns null.
+ *
+ * Elements are matched by element(s) they select, i.e. control is matched if its element(s) have been previously selected,
+ * and group is matched if all of its control and non-control elements have been previously selected.
+ * @param object A jQueryObject whose selection is matched, or a HTMLElement to check if some cached element has selected it.
+ */
+function findCachedElement(object) {
+    var _a;
+    let selectedElements = object instanceof HTMLElement ? [object] : [...object];
+    return (_a = cachedControlsAndGroups
+        .find($cachedElement => $cachedElement.length === selectedElements.length
+        && [...$cachedElement].every(element => selectedElements.includes(element)))) !== null && _a !== void 0 ? _a : null;
+}
+/**
+ * Adds the provided form control / group to the cache.
+ * @see findCachedElement()
+ */
+function addToCache(jQueryObject) {
+    cachedControlsAndGroups.push(jQueryObject);
+}
+/**
+ * Removes the provided form control / group from the cache.
+ * @param jQueryObject A form control / group object, not a vanilla jQuery object.
+ */
+function removeFromCache(jQueryObject) {
+    let cachedElement = findCachedElement(jQueryObject);
+    if (cachedElement == null)
+        return;
+    let index = cachedControlsAndGroups.indexOf(cachedElement);
+    cachedControlsAndGroups.splice(index, 1);
 }
 /*========================== Enums ==========================*/
 const FormControlStatusEnum = {
@@ -4595,6 +4763,10 @@ const FormControlStatusEnum = {
     PENDING: 'PENDING',
     DISABLED: 'DISABLED'
 };
+/*========================== Others ==========================*/
+function isNullOrWhitespace(searchTerm) {
+    return searchTerm == null || (/\S/.test(searchTerm)) === false;
+}
 
 /**
  * Creates an Observable that emits information whether the provided target element
@@ -4624,30 +4796,330 @@ function fromResize(target) {
     });
 }
 
+let originalInit = jQuery.fn.init;
+/**
+ * Form control is the extended jQuery object of a single input element.
+ */
+let formControl = function (jQueryObject) {
+    originalInit.call(this, jQueryObject);
+    this.isFormControl = true;
+};
+/**
+ * Form group is the extended jQuery object of multiple input elements, or a form.
+ */
+let formGroup = function (jQueryObject) {
+    originalInit.call(this, jQueryObject);
+    this.isFormGroup = true;
+};
+formControl.prototype = new originalInit();
+formGroup.prototype = new originalInit();
+/**
+ * Used as jQuery constructor function to check and return a form control,
+ * or a form group, if all of the selected elements are valid form elements,
+ * such as input, select, textarea, form or have defined attribute `[formControl]`.
+ */
+function overriddenConstructor() {
+    // Skip unnecessary execution...
+    if (arguments[0] instanceof Object && (arguments[0].isFormControl || arguments[0].isFormGroup))
+        return arguments[0];
+    // Original constructor
+    let jQueryObject = new originalInit(arguments[0], arguments[1]);
+    if (onlyFormControls(jQueryObject) === false)
+        return jQueryObject;
+    return isGroupSelected(jQueryObject) ? asFormGroup(jQueryObject) : asFormControl(jQueryObject);
+    function onlyFormControls(jQueryObject) {
+        return jQueryObject.toArray().length > 0 && jQueryObject.toArray().every(singleJQueryObject => isValidFormControl(singleJQueryObject) || singleJQueryObject instanceof HTMLFormElement);
+    }
+    function isGroupSelected(jQueryObject) {
+        return jQueryObject.toArray().filter(singleJQueryObject => isValidFormControl(singleJQueryObject)).length > 1
+            && !checkIfRadioControl(jQueryObject) && !checkIfCheckboxControl(jQueryObject) || jQueryObject[0] instanceof HTMLFormElement;
+    }
+}
+/**
+ * @see {@link JQuery.asFormControl}
+ */
+function asFormControl(jQueryObject, name, valueChangesUI = null, touchedUI$ = null, dirtyUI$ = null) {
+    // See if it's cached
+    let cachedElement = findCachedElement(jQueryObject);
+    if (cachedElement)
+        return cachedElement;
+    // Handle empty controls $().asFormControl(), or if nothing's selected
+    if (jQueryObject.length === 0)
+        jQueryObject = jQueryObject.add('<dummy-element></dummy-element>');
+    // Use fancy names in the Dev console.
+    jQueryObject = new formControl(jQueryObject);
+    jQueryObject.each((_, element) => element.setAttribute('formControl', '')); // radio / checkbox controls have multiple elements.
+    jQueryObject._controls = [jQueryObject];
+    // If control belongs to shadow root, mark the host with an attribute
+    if (jQueryObject[0].getRootNode() instanceof ShadowRoot)
+        jQueryObject[0].getRootNode().host.setAttribute('formControl-shadow-root', '');
+    if (name)
+        jQueryObject[0].setAttribute('name', name);
+    return convertToFormObject(jQueryObject, valueChangesUI, touchedUI$, dirtyUI$);
+}
+/**
+ * @see {@link JQuery.asFormGroup}
+ */
+function asFormGroup(jQueryObject, valueChangesUI = null, touchedUI$ = null, dirtyUI$ = null) {
+    // See if it's cached
+    let cachedElement = findCachedElement(jQueryObject);
+    if (cachedElement)
+        return cachedElement;
+    jQueryObject = new formGroup(jQueryObject);
+    let selectedControlElements = [...jQueryObject].flatMap(element => isValidFormControl(element)
+        ? element
+        : [...element.querySelectorAll('input, select, textarea, [formControl]'),
+            ...[...element.querySelectorAll('[formControl-shadow-root]')].flatMap(shadowHost => [...shadowHost.shadowRoot.querySelectorAll('input, select, textarea, [formControl]')])]);
+    let controls = combineControls(selectedControlElements);
+    // false -> group is a single control (infinite loop fix)
+    if (controls === false)
+        jQueryObject._controls = [jQueryObject];
+    else
+        jQueryObject._controls = controls;
+    return convertToFormObject(jQueryObject, valueChangesUI, touchedUI$, dirtyUI$);
+}
+function convertToFormObject(jQueryObject, valueChangesUI = null, touchedUI$ = null, dirtyUI$ = null) {
+    // Add getter and setter for the 'controls' property. Any updates to this value can now be observed.
+    Object.defineProperty(jQueryObject, 'controls', {
+        get() {
+            return this._controls;
+        },
+        set(value) {
+            if (jQueryObject.isFormControl && value.length > 1) {
+                transitionControlToGroup(jQueryObject, value);
+                return;
+            }
+            this._controls = value;
+            this.controlsSubject.next(value);
+        },
+        configurable: true
+    });
+    jQueryObject.controlsSubject = new BehaviorSubject(jQueryObject.controls);
+    jQueryObject.controls$ = jQueryObject.controlsSubject.asObservable();
+    if (jQueryObject.isFormGroup)
+        // Make sure selected elements are transformed as the list is updated
+        jQueryObject.controls$.pipe(skip(1)).subscribe(controls => controls.filter($formControl => !$formControl.isFormControl && !$formControl.isFormGroup).forEach($formControl => convertToFormObject($formControl)));
+    addFormControlProperties(jQueryObject, valueChangesUI, touchedUI$, dirtyUI$);
+    // Cache it
+    addToCache(jQueryObject);
+    return jQueryObject;
+}
+function addFormControlProperties(jQueryObject, valueChangesUI = null, touchedUI$ = null, dirtyUI$ = null) {
+    addComplementaryGettersSetters(jQueryObject);
+    jQueryObject.valueChangesSubject = new Subject();
+    jQueryObject.valueChanges = jQueryObject.valueChangesSubject.asObservable().pipe(// Subject so it can be triggered
+    map(value => { var _a, _b; return (_b = (_a = jQueryObject.valueMapFn) === null || _a === void 0 ? void 0 : _a.call(jQueryObject, value)) !== null && _b !== void 0 ? _b : value; }), // Custom mapping
+    distinctUntilChanged(), share()); // Distinct and shared
+    jQueryObject.valueChanges.subscribe(value => jQueryObject.value = value); // Assign to "value"
+    valueChangesUI = valueChangesUI != null
+        ? valueChangesUI
+        : jQueryObject.controls$.pipe(switchMap(_ => jQueryObject.isFormControl
+            ? fromEvent(jQueryObject, 'input').pipe(startWith(''), map(_ => getFormControlValue(jQueryObject)))
+            : merge(...jQueryObject.controls.flatMap($c => [$c.valueChanges, $c.disabledSubject])).pipe(delay(1), startWith(''), map(_ => constructFormGroupValue(jQueryObject)))
+        // Note 1: startWith() sets the value when the controls array changes
+        // Note 2: delay makes sure value change of an individual control would trigger its subscription handlers before group one's would. (RxJS is synchronous by default)
+        ));
+    valueChangesUI.subscribe(value => jQueryObject.valueChangesSubject.next(value));
+    // Touched state
+    jQueryObject.touchedSubject = new Subject();
+    jQueryObject.markAsUntouched();
+    touchedUI$ = touchedUI$
+        ? touchedUI$
+        : jQueryObject.controls$.pipe(switchMap(_ => jQueryObject.isFormControl
+            ? fromEvent(jQueryObject, 'focus')
+            : merge(...jQueryObject.controls.map($formControl => $formControl.touchedSubject.asObservable())).pipe(filter(isTouched => isTouched), delay(1))));
+    touchedUI$.subscribe(_ => jQueryObject.markAsTouched());
+    // Dirty state
+    jQueryObject.dirtySubject = new Subject();
+    jQueryObject.markAsPristine();
+    dirtyUI$ = dirtyUI$
+        ? dirtyUI$
+        : jQueryObject.controls$.pipe(switchMap(_ => jQueryObject.isFormControl
+            ? jQueryObject.valueChanges
+            : merge(...jQueryObject.controls.map($formControl => $formControl.dirtySubject.asObservable())).pipe(filter(isDirty => isDirty), delay(1))));
+    dirtyUI$.subscribe(_ => jQueryObject.markAsDirty());
+    // Disabled subject
+    jQueryObject.disabledSubject = new Subject();
+}
+/*========================== Private Part ==========================*/
+function getFormControlValue($formControl) {
+    let isCheckbox = checkIfCheckboxControl($formControl);
+    let isRadio = checkIfRadioControl($formControl);
+    return !isCheckbox && !isRadio
+        ? $formControl[0].value
+        : isCheckbox
+            ? getCheckboxValue($formControl)
+            : getRadioValue($formControl);
+}
+function constructFormGroupValue(jQueryObject) {
+    let nonameIdx = 0;
+    let nonIndexedArray = jQueryObject.controls
+        .filter($control => !$control.attr('disabled'))
+        .map($control => { var _a; return ({ name: (_a = $control.attr('name')) !== null && _a !== void 0 ? _a : '_noname' + nonameIdx++, value: $control.value }); });
+    return convertArrayToJson(nonIndexedArray);
+}
+/**
+ * Adds properties for touched - untouched, dirty - pristine.
+ * @param jQueryObject
+ */
+function addComplementaryGettersSetters(jQueryObject) {
+    // touched
+    Object.defineProperty(jQueryObject, 'touched', {
+        get() {
+            return this._touched;
+        },
+        set(value) {
+            this._touched = value;
+            this._untouched = !value;
+        },
+        configurable: true
+    });
+    // untouched
+    Object.defineProperty(jQueryObject, 'untouched', {
+        get() {
+            return this._untouched;
+        },
+        set(value) {
+            this._untouched = value;
+            this._touched = !value;
+        },
+        configurable: true
+    });
+    // dirty
+    Object.defineProperty(jQueryObject, 'dirty', {
+        get() {
+            return this._dirty;
+        },
+        set(value) {
+            this._dirty = value;
+            this._pristine = !value;
+        },
+        configurable: true
+    });
+    // pristine
+    Object.defineProperty(jQueryObject, 'pristine', {
+        get() {
+            return this._pristine;
+        },
+        set(value) {
+            this._pristine = value;
+            this._dirty = !value;
+        },
+        configurable: true
+    });
+}
+/**
+ * Function called by the controls setter when number of controls is over one.
+ * State is copied over into the new group.
+ * Any transformations by other files need to be registered.
+ *
+ * @see {@link registerInputToGroupTransformation}
+ *
+ * @param $formControl
+ * @param newControls
+ */
+function transitionControlToGroup($formControl, newControls) {
+    // Appropriate naming
+    let $formGroup = $formControl;
+    // Detach current jQuery object ($formControl) from the controls element.
+    removeFromCache($formGroup);
+    let $detachedControl = $formControl.asFormControl();
+    addToCache($formGroup);
+    // Copy state into the new control
+    $detachedControl.touched = $formGroup.touched;
+    $detachedControl.dirty = $formGroup.dirty;
+    $detachedControl.value = $formGroup.value;
+    let usesCustomValueChanges = $formGroup.value !== getFormControlValue($formGroup);
+    $formGroup._controls = [$detachedControl, ...newControls.filter($c => $c !== $formGroup)];
+    $formGroup.controlsSubject.next($formGroup.controls);
+    if (usesCustomValueChanges === false)
+        $formGroup.value = constructFormGroupValue($formGroup);
+    inputToGroupTransformations.forEach(transformation => transformation($formGroup, $detachedControl));
+    $formGroup.isFormControl = false;
+    $formGroup.isFormGroup = true;
+}
+let inputToGroupTransformations = [];
+/**
+ * Used to register needed transformation when converting control into group.
+ * @param transformation
+ */
+function registerInputToGroupTransformation(transformation) {
+    inputToGroupTransformations.push(transformation);
+}
+/**
+ * @see {@link JQuery.destroyControl}
+ */
+function destroyControl(jQueryObject) {
+    // First, remove validation
+    if (jQueryObject.isValidationEnabled)
+        jQueryObject.disableValidation();
+    // Close observables
+    jQueryObject.valueChangesSubject.complete();
+    jQueryObject.touchedSubject.complete();
+    jQueryObject.dirtySubject.complete();
+    jQueryObject.controlsSubject.complete();
+    // Delete added properties
+    delete jQueryObject.valueChangesSubject;
+    delete jQueryObject.touchedSubject;
+    delete jQueryObject.dirtySubject;
+    delete jQueryObject.controlsSubject;
+    delete jQueryObject.valueChanges;
+    delete jQueryObject.controls$;
+    delete jQueryObject.value;
+    delete jQueryObject.touched;
+    delete jQueryObject.untouched;
+    delete jQueryObject.dirty;
+    delete jQueryObject.pristine;
+    delete jQueryObject._touched;
+    delete jQueryObject._untouched;
+    delete jQueryObject._dirty;
+    delete jQueryObject._pristine;
+    removeFromCache(jQueryObject);
+    delete jQueryObject._controls;
+    delete jQueryObject.controls;
+    delete jQueryObject.isFormControl;
+}
+/**
+ * @see {@link JQuery.destroyGroup}
+ */
+function destroyGroup(jQueryObject) {
+    // jQueryObject.controls.forEach(destroyControl);
+    destroyControl(jQueryObject);
+    delete jQueryObject.isFormGroup;
+}
+
 /*========================== Public API ==========================*/
 function enableValidation(jQueryObject) {
     // Check if it's already enabled
-    if (jQueryObject.valid !== undefined)
+    if (jQueryObject.isValidationEnabled)
         return;
     // Check if it's actually a form control (maybe it's empty)
     if (!jQueryObject.isFormControl && !jQueryObject.isFormGroup)
-        jQueryObject.convertToFormControl();
-    jQueryObject.selectedFormControls$.subscribe(selectedFormControls => selectedFormControls.filter($formControl => $formControl.valid === undefined && $formControl !== jQueryObject).forEach($formControl => enableValidation($formControl)));
+        jQueryObject = jQueryObject.asFormGroup();
+    jQueryObject.controls$.subscribe(controls => controls.filter($formControl => $formControl.valid === undefined && $formControl !== jQueryObject).forEach($formControl => enableValidation($formControl)));
     // valid == true -> invalid = false;
     addValidInvalidGetterSetter(jQueryObject);
-    // Programatically update the validity.
+    // Programmatically update the validity.
     jQueryObject.manualValidityUpdateSubject = new Subject();
-    if (jQueryObject.selectedFormControls.length === 1)
+    if (jQueryObject.isFormControl)
         setValidationRulesFromAttributes(jQueryObject);
-    let statusChangesSubject = new Subject();
-    jQueryObject.statusChangesSubject = statusChangesSubject;
-    let sub1 = jQueryObject.selectedFormControls$.pipe(switchMap(selectedFormControls => merge(selectedFormControls.length === 0 ? NEVER : selectedFormControls.length === 1 ? jQueryObject.valueChanges : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.statusChanges)).pipe(delay(1)), jQueryObject.manualValidityUpdateSubject.asObservable())), startWith(''), tap(_ => { var _a; return jQueryObject.errors = (_a = jQueryObject.getValidators()) === null || _a === void 0 ? void 0 : _a.map(validatorFn => validatorFn(jQueryObject)).reduce((acc, curr) => curr ? Object.assign(Object.assign({}, acc), curr) : acc, null); }), map(_ => (jQueryObject.selectedFormControls.length > 1 && jQueryObject.errors) || jQueryObject.selectedFormControls.some($formControl => $formControl.errors && !$formControl.attr('disabled') && !$formControl.is('[type=hidden]'))
-        ? FormControlStatusEnum.INVALID : FormControlStatusEnum.VALID), tap(status => jQueryObject.valid = status === FormControlStatusEnum.VALID)).subscribe(status => statusChangesSubject.next(status));
-    jQueryObject.statusChanges = statusChangesSubject.asObservable().pipe(share());
+    /*** statusChanges ***/
+    jQueryObject.statusChanges = jQueryObject.controls$.pipe(switchMap(controls => merge(jQueryObject.isFormControl ? jQueryObject.valueChanges : merge(...controls.map($formControl => $formControl.statusChanges)).pipe(delay(1)), jQueryObject.manualValidityUpdateSubject.asObservable(), jQueryObject.disabledSubject).pipe(startWith(''))), 
+    // Note 1: Controls update status on value change
+    // Note 2: Groups when their controls change status (which supersedes valueChanges)
+    // Note 3: startWith() updates validity when the controls array changes
+    startWith(''), tap(_ => { var _a; return jQueryObject.errors = (_a = jQueryObject.getValidators()) === null || _a === void 0 ? void 0 : _a.map(validatorFn => validatorFn(jQueryObject)).reduce((acc, curr) => curr ? Object.assign(Object.assign({}, acc), curr) : acc, null); }), map(_ => (jQueryObject.isFormGroup && jQueryObject.errors)
+        || jQueryObject.controls.some($formControl => $formControl.errors && !$formControl.attr('disabled') && [...$formControl].some(e => e.getAttribute('type') !== 'hidden'))
+        ? FormControlStatusEnum.INVALID : FormControlStatusEnum.VALID), 
+    // Note: Invalid when either object itself or some of the selected non-hidden, non-disabled, controls have errors.
+    share());
     // Subscribe for status update
-    jQueryObject.statusChanges.subscribe(status => jQueryObject.status = status);
-    attachPopper(jQueryObject);
-    jQueryObject._existingValidationSubscription = sub1;
+    jQueryObject._existingValidationSubscription =
+        jQueryObject.statusChanges.subscribe(status => { jQueryObject.status = status; jQueryObject.valid = status === FormControlStatusEnum.VALID; });
+    // Attach popper
+    if (!jQueryObject[0].matches('dummy-element'))
+        attachPopper(jQueryObject);
+    return jQueryObject;
 }
 function updateValidity(jQueryObject) {
     jQueryObject.manualValidityUpdateSubject.next();
@@ -4662,11 +5134,21 @@ function getValidators(jQueryObject) {
 }
 function disableValidation(jQueryObject) {
     jQueryObject._existingValidationSubscription.unsubscribe();
+    jQueryObject.manualValidityUpdateSubject.complete();
     delete jQueryObject._existingValidationSubscription;
-    jQueryObject.statusChangesSubject.complete();
-    delete jQueryObject.statusChangesSubject;
+    delete jQueryObject.manualValidityUpdateSubject;
+    delete jQueryObject.statusChanges;
+    jQueryObject.validityPopper.destroy;
+    delete jQueryObject.validityPopper;
+    delete jQueryObject.isValidityMessageShown$;
     delete jQueryObject.valid;
     delete jQueryObject.invalid;
+    delete jQueryObject._valid;
+    delete jQueryObject._invalid;
+    delete jQueryObject.errors;
+    delete jQueryObject._validators;
+    delete jQueryObject.isValidationEnabled;
+    return jQueryObject;
 }
 let registeredAttributeValidators = {};
 /**
@@ -4674,7 +5156,7 @@ let registeredAttributeValidators = {};
  * @param attributeValidators Object that has desired attribute names as keys, whose value are validator functions.
  */
 function registerAttributeValidators(attributeValidators) {
-    registeredAttributeValidators = Object.assign(Object.assign({}, attributeValidators), attributeValidators);
+    registeredAttributeValidators = Object.assign(Object.assign({}, registeredAttributeValidators), attributeValidators);
 }
 /**
  * Attaches validity popper, which will be displayed when control is dirty and invalid, auto-flip when needed, auto-update whenever reference changes visibility.
@@ -4702,7 +5184,7 @@ function attachPopper(jQueryObject) {
         return originalSetOptions(options);
     };
     // Control the placement and handle DOM visibility
-    let reference$ = jQueryObject.selectedFormControls$.pipe(filter(selectedFormControls => selectedFormControls.length > 0), map(_ => determinePopperPositioning(jQueryObject).$reference), shareReplay(1));
+    let reference$ = jQueryObject.controls$.pipe(filter(controls => controls.length > 0), map(_ => determinePopperPositioning(jQueryObject).$reference), shareReplay(1));
     // Setup reference element
     reference$.subscribe($reference => {
         $reference.addClass('popper-reference').append($popper);
@@ -4710,17 +5192,18 @@ function attachPopper(jQueryObject) {
         jQueryObject.validityPopper.update();
     });
     // Visibility - position/placement update
-    reference$.pipe(takeWhile(_ => !isPlacedManually), switchMap($reference => fromFullVisibility($reference[0])), takeWhile(_ => !isPlacedManually))
+    let v$ = reference$.pipe(takeWhile(_ => !isPlacedManually), switchMap($reference => fromFullVisibility($reference[0])), takeWhile(_ => !isPlacedManually))
         .subscribe(isFullyVisible => isFullyVisible ? updatePopperPlacement(jQueryObject) : $popper.css('visibility', 'hidden')); // updatePopperPlacement knows about visibility
     // Resize - position tracking
     let isFresh = true, isTransition = false;
-    reference$.pipe(switchMap($reference => fromResize($reference[0])), // Observe reference's resize
-    tap(_ => isFresh ? (isFresh = false) || jQueryObject.validityPopper.forceUpdate() : isTransition = true), // Do the first one
+    let r$ = reference$.pipe(switchMap($reference => fromResize($reference[0])), // Observe reference's resize
+    tap(_ => isFresh ? (isFresh = false) || jQueryObject.validityPopper.forceUpdate() : isTransition = true), // Do the first one (?. - used in teardown)
     debounceTime(34), // If triggered more than once, debounce 100ms
     tap(_ => isTransition && jQueryObject.validityPopper.forceUpdate()) // and do it one final time
     ).subscribe(_ => (isFresh = true) && (isTransition = false));
+    jQueryObject.controls$.subscribe(null, null, () => { v$.unsubscribe(); r$.unsubscribe(); });
     // Handle display of errors
-    let dirtyObservable$ = jQueryObject.dirtySubject.asObservable().pipe(filter(_ => jQueryObject.selectedFormControls.every($c => $c.dirty)), distinctUntilChanged());
+    let dirtyObservable$ = jQueryObject.dirtySubject.asObservable().pipe(filter(_ => jQueryObject.controls.every($c => $c.dirty)), distinctUntilChanged());
     let popperShownSubject = new BehaviorSubject(false);
     jQueryObject.isValidityMessageShown$ = popperShownSubject.asObservable().pipe(distinctUntilChanged());
     let wasValidityMessageShown = false;
@@ -4735,7 +5218,7 @@ function attachPopper(jQueryObject) {
         // Show if dirty and invalid (with personal errors) or hide otherwise
         if (jQueryObject.dirty && jQueryObject.invalid && jQueryObject.errors) {
             // Form groups, by default, show their errors once all of their descendants become dirty
-            if (jQueryObject.selectedFormControls.length > 1 && jQueryObject.selectedFormControls.some(formControl => formControl.pristine))
+            if (jQueryObject.controls.length > 1 && jQueryObject.controls.some(formControl => formControl.pristine))
                 return;
             let errorMessage = Object.keys(jQueryObject.errors).map(key => typeof jQueryObject.errors[key] === 'string' ? jQueryObject.errors[key] : validationErrors[key]).join('\n');
             $popper.find('.field-validation').addClass('field-validation-error').html(errorMessage);
@@ -4757,11 +5240,11 @@ function attachPopper(jQueryObject) {
     });
 }
 function hasError(jQueryObject, errorCode) {
-    return Object.keys(jQueryObject.errors).some(key => key === errorCode);
+    return jQueryObject.errors && Object.keys(jQueryObject.errors).some(key => key === errorCode);
 }
 /*========================== Private Part ==========================*/
 /**
- * Adds validator functions to the control based on its properties. Works with radios.
+ * Adds validator functions to the control based on its properties. Works with radios and checkboxes.
  * @param $formControl
  */
 function setValidationRulesFromAttributes($formControl) {
@@ -4783,7 +5266,8 @@ function addValidInvalidGetterSetter(jQueryObject) {
         set(value) {
             this._valid = value;
             this._invalid = !value;
-        }
+        },
+        configurable: true
     });
     Object.defineProperty(jQueryObject, 'invalid', {
         get() {
@@ -4792,7 +5276,14 @@ function addValidInvalidGetterSetter(jQueryObject) {
         set(value) {
             this._invalid = value;
             this._valid = !value;
-        }
+        },
+        configurable: true
+    });
+    Object.defineProperty(jQueryObject, 'isValidationEnabled', {
+        get() {
+            return this.valid !== undefined;
+        },
+        configurable: true
     });
 }
 /**
@@ -4807,8 +5298,8 @@ function determinePopperPositioning(jQueryObject) {
         let predefinedPlacement = jQueryObject.attr('popper-placement');
         if (predefinedPlacement)
             return predefinedPlacement;
-        if (jQueryObject.selectedFormControls.length === 1)
-            return hasInputsOnLeft(jQueryObject.selectedFormControls[0], reference) ? 'right' : 'left';
+        if (jQueryObject.isFormControl && reference)
+            return hasInputsOnLeft(jQueryObject.controls[0], reference) ? 'right' : 'left';
         return 'left';
     }
     /**
@@ -4819,7 +5310,7 @@ function determinePopperPositioning(jQueryObject) {
         // Form controls that come before current one in DOM.
         let previousFormControlElements = cachedControlsAndGroups.slice(0, cachedControlsAndGroups.indexOf($formControl))
             .flatMap($e => $e.toArray())
-            .filter(element => isFormControlType(element));
+            .filter(element => isValidFormControl(element));
         return previousFormControlElements.some(previousControl => {
             let previousControlRect = previousControl.getBoundingClientRect();
             return Math.abs(previousControlRect.top - referenceRect.top) < referenceRect.height
@@ -4829,14 +5320,15 @@ function determinePopperPositioning(jQueryObject) {
     }
     // Reference is not predefined, let's find it.
     let $reference;
-    if (jQueryObject.selectedFormControls.length === 1 && checkIfRadioGroup(jQueryObject) === false) {
-        let formControl = jQueryObject.selectedFormControls[0][0];
+    if (jQueryObject.isFormControl && checkIfRadioControl(jQueryObject) === false && checkIfCheckboxControl(jQueryObject) === false) {
+        let formControl = jQueryObject.controls[0][0];
         $reference = $(formControl.parentElement);
     }
     else {
-        let references = jQueryObject.selectedFormControls.flatMap($formControl => $formControl.toArray()) // flatMap handles multiple element such as radios
+        let references = jQueryObject.controls.flatMap($formControl => $formControl.toArray()) // flatMap handles multiple element such as radios / checkboxes
             .filter(e => e.getAttribute('type') !== 'hidden') // ignore 'hidden' inputs
-            .map(e => $(e.parentElement)); // references are parents.
+            .map(e => $(e.parentElement))
+            .filter($e => $e.length > 0); // references are parents.
         // Find the common ancestor of all the references
         if (references.every($reference => $reference === references[0]))
             $reference = references[0];
@@ -4847,7 +5339,7 @@ function determinePopperPositioning(jQueryObject) {
 }
 /**
  * Find the element that is a common ancestor of all the proveded objects.
- * Used to find the popper reference of form groups (or radio control).
+ * Used to find the popper reference of form groups (or radio / checkbox control).
  */
 function getCommonAncestor(...objects) {
     let parentsA = getParents(objects[0]);
@@ -4877,346 +5369,21 @@ function updatePopperPlacement(jQueryObject) {
             .subscribe(isShown => !isShown && $popper.hide());
     });
 }
-
-let originalInit = jQuery.fn.init;
 /**
- * Form control is the extended jQuery object of a single input element.
+ * Validator functions that came from the attributes stay on the control, other go to the group.
+ * @param $newGroup
+ * @param $oldControl
  */
-let formControl = function (jQueryObject) {
-    originalInit.call(this, jQueryObject);
-    this.isFormControl = true;
-};
-/**
- * Form group is the extended jQuery object of multiple input elements, or a form.
- */
-let formGroup = function (jQueryObject) {
-    originalInit.call(this, jQueryObject);
-    this.isFormGroup = true;
-};
-formControl.prototype = new originalInit();
-formGroup.prototype = new originalInit();
-function extendFormElements() {
-    let baseAttrFn = jQuery.fn.attr;
-    let baseValFn = jQuery.fn.val;
-    jQuery.fn.extend({
-        val(value_function) {
-            var _a;
-            if (value_function === undefined && (this.isFormControl || this.isFormGroup))
-                return (_a = this.value) !== null && _a !== void 0 ? _a : baseValFn.apply(this, arguments);
-            let result = baseValFn.apply(this, arguments);
-            // Emit new valueChanges value.
-            if (!(value_function instanceof Function) && value_function !== undefined && (this.isFormControl || this.isFormGroup))
-                this.valueChangesSubject.next(value_function);
-            return result;
-        },
-        attr(attributeName, value_function) {
-            // Extend "disabled" attribute to affect autocomplete display fields,
-            // and to trigger validation
-            if (attributeName === 'disabled' && value_function !== undefined && isFormControlType(this[0])) {
-                this.each(function () {
-                    let name = $(this).attr('name');
-                    if (name) {
-                        let $sibling = $(this).siblings('[name="' + name + '_DISPLAY"]:eq(0)');
-                        if ($sibling.length !== 0)
-                            $sibling.attr('disabled', value_function);
-                    }
-                    if (value_function instanceof Function)
-                        return;
-                    setTimeout(() => {
-                        if (value_function === true)
-                            $(this).statusChangesSubject && $(this).statusChangesSubject.next(FormControlStatusEnum.DISABLED);
-                        else
-                            $(this).updateValidity();
-                    });
-                });
-            }
-            if (attributeName === 'type' && value_function !== undefined) {
-                if ($(this).is('[type=hidden]') && value_function !== 'hidden' || $(this).is(':not([type=hidden])') && value_function === 'hidden')
-                    setTimeout(() => $(this).updateValidity());
-            }
-            return baseAttrFn.apply(this, arguments);
-        },
-        markAsTouched() {
-            this.touched = true;
-            this.touchedSubject.next(true);
-        },
-        markAllAsTouched() {
-            var _a;
-            this.touched = true;
-            this.touchedSubject.next(true);
-            (_a = this.selectedFormControls) === null || _a === void 0 ? void 0 : _a.forEach($d => $d.markAsTouched());
-        },
-        markAsUntouched() {
-            var _a;
-            this.untouched = true;
-            this.touchedSubject.next(false);
-            (_a = this.selectedFormControls) === null || _a === void 0 ? void 0 : _a.forEach($d => {
-                $d.untouched = true;
-                $d.touchedSubject.next(false);
-            });
-        },
-        markAsDirty() {
-            var _a;
-            this.dirty = true;
-            (_a = this.dirtySubject) === null || _a === void 0 ? void 0 : _a.next(true);
-        },
-        markAllAsDirty() {
-            var _a;
-            this.markAsDirty();
-            (_a = this.selectedFormControls) === null || _a === void 0 ? void 0 : _a.forEach($d => $d.markAsDirty());
-        },
-        markAsPristine() {
-            var _a, _b;
-            this.pristine = true;
-            (_a = this.dirtySubject) === null || _a === void 0 ? void 0 : _a.next(false);
-            (_b = this.selectedFormControls) === null || _b === void 0 ? void 0 : _b.forEach($d => {
-                var _a;
-                $d.pristine = true;
-                (_a = $d === null || $d === void 0 ? void 0 : $d.dirtySubject) === null || _a === void 0 ? void 0 : _a.next(false);
-            });
-        },
-        enableValidation() {
-            enableValidation(this);
-            return this;
-        },
-        disableValidation() {
-            disableValidation(this);
-            return this;
-        },
-        setValidators(newValidator) {
-            return setValidators(this, newValidator);
-        },
-        getValidators() {
-            return getValidators(this);
-        },
-        updateValidity() {
-            return updateValidity(this);
-        },
-        hasError(errorCode) {
-            return hasError(this, errorCode);
-        },
-        reset() {
-            this.markAsUntouched();
-            this.markAsPristine();
-            // TODO: handle if there's more than one form
-            if (this[0] instanceof HTMLFormElement) {
-                this[0].reset();
-                return;
-            }
-            this.val('');
-            let descendants = this.selectedFormControls;
-            descendants.forEach($d => {
-                $d.markAsUntouched();
-                $d.markAsPristine();
-                $d.val('');
-            });
-        },
-        logErrors() {
-            if (this.errors)
-                console.log(this.errors);
-            let descendants = this.selectedFormControls;
-            descendants.forEach($e => $e.errors != null && console.log($e, $e.errors));
-        },
-        convertToFormControl(valueChangesUI, touchedUI$, dirtyUI$) {
-            return convertToFormControl(this, valueChangesUI, touchedUI$, dirtyUI$);
-        }
-    });
-    /*===== Constructor =====*/
-    jQuery.fn.init = function () {
-        let jQueryObject = new originalInit(arguments[0], arguments[1]);
-        if (areFormControlsSelected(jQueryObject) === false)
-            return jQueryObject;
-        return convertToFormControl(jQueryObject);
-    };
-    function areFormControlsSelected(jQueryObject) {
-        return jQueryObject.toArray().some(singleJQueryObject => isFormControlType(singleJQueryObject) || singleJQueryObject instanceof HTMLFormElement);
-    }
+function migrateValidationToNewGroup($newGroup, $oldControl) {
+    let attributeValidators = Object.values(registeredAttributeValidators).flatMap(e => e);
+    let validatorsFromAttributes = $newGroup.getValidators().filter(valFn => attributeValidators.includes(valFn));
+    let otherValidators = $newGroup.getValidators().filter(valFn => attributeValidators.includes(valFn) === false);
+    $newGroup.setValidators(otherValidators);
+    $oldControl.setValidators(validatorsFromAttributes);
+    $newGroup.updateValidity();
+    $oldControl.updateValidity();
 }
-/**
- * @see {@link JQuery.convertToFormControl}
- */
-function convertToFormControl(jQueryObject, valueChangesUI = null, touchedUI$ = null, dirtyUI$ = null) {
-    // Use fancy names in the Dev console.
-    jQueryObject = isGroupSelected(jQueryObject) ? new formGroup(jQueryObject) : new formControl(jQueryObject);
-    // See if it's cached
-    let cachedElement = findCachedElement(jQueryObject);
-    if (cachedElement)
-        return cachedElement;
-    // Add getter and setter for the 'selectedFormControls' property. Any updates to this value can now be observed.
-    Object.defineProperty(jQueryObject, 'selectedFormControls', {
-        get() {
-            return this._selectedFormControls;
-        },
-        set(value) {
-            this._selectedFormControls = value;
-            this.selectedFormControlsSubject.next(value);
-        }
-    });
-    jQueryObject.selectedFormControlsSubject = new BehaviorSubject([]);
-    jQueryObject.selectedFormControls$ = jQueryObject.selectedFormControlsSubject.asObservable();
-    if (jQueryObject.length > 1 || jQueryObject[0] instanceof HTMLFormElement) {
-        let selectedFormControlsElements = (jQueryObject[0] instanceof HTMLFormElement ? jQueryObject.find('input') : jQueryObject).toArray()
-            .filter(htmlElement => isFormControlType(htmlElement));
-        jQueryObject.selectedFormControls =
-            selectedFormControlsElements.filter(element => element.getAttribute('type') !== 'radio').map(element => $(element))
-                .concat(checkIfRadioGroup(jQueryObject) ? [jQueryObject] : Object.values(extractRadioGroups(jQueryObject)).map(controlElements => $(controlElements)));
-    }
-    else if (jQueryObject.length === 1)
-        jQueryObject.selectedFormControls = [jQueryObject];
-    else
-        jQueryObject.selectedFormControls = [];
-    // Check new selected elements if they are indeed form control
-    jQueryObject.selectedFormControls$.pipe(skip(1)).subscribe(selectedFormControls => selectedFormControls.filter($formControl => !$formControl.isFormControl && !$formControl.isFormGroup).forEach($formControl => convertToFormControl($formControl)));
-    addFormControlProperties(jQueryObject, valueChangesUI, touchedUI$, dirtyUI$);
-    // Cache it
-    addToCache(jQueryObject);
-    return jQueryObject;
-}
-function addFormControlProperties(jQueryObject, valueChangesUI = null, touchedUI$ = null, dirtyUI$ = null) {
-    addComplementaryGettersSetters(jQueryObject);
-    let valueChangesSubject = new Subject();
-    jQueryObject.valueChangesSubject = valueChangesSubject;
-    valueChangesUI = valueChangesUI
-        ? valueChangesUI
-        : jQueryObject.selectedFormControls$.pipe(switchMap(selectedFormControls => selectedFormControls.length === 1
-            ? fromEvent(jQueryObject, 'input')
-            : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.valueChanges)).pipe(delay(1))
-        // Note: delay makes sure value change of an individual control would trigger its subscription handlers before group one's would. (RxJS is synchronous by default)
-        ), map(_ => getFormControlValue(jQueryObject)));
-    valueChangesUI.subscribe(value => valueChangesSubject.next(value));
-    jQueryObject.valueChanges = valueChangesSubject.asObservable().pipe(distinctUntilChanged(), share());
-    jQueryObject.valueChanges.subscribe(value => jQueryObject.value = value);
-    // Touched state
-    jQueryObject.touchedSubject = new Subject();
-    jQueryObject.markAsUntouched();
-    touchedUI$ = touchedUI$
-        ? touchedUI$
-        : jQueryObject.selectedFormControls$.pipe(switchMap(selectedFormControls => selectedFormControls.length === 1
-            ? fromEvent(jQueryObject, 'focus')
-            : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.touchedSubject.asObservable())).pipe(filter(isTouched => isTouched), delay(1))));
-    touchedUI$.subscribe(_ => jQueryObject.markAsTouched());
-    // Dirty state
-    jQueryObject.dirtySubject = new Subject();
-    jQueryObject.markAsPristine();
-    dirtyUI$ = dirtyUI$
-        ? dirtyUI$
-        : jQueryObject.selectedFormControls$.pipe(switchMap(selectedFormControls => selectedFormControls.length === 1
-            ? fromEvent(jQueryObject, 'input')
-            : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.dirtySubject.asObservable())).pipe(filter(isDirty => isDirty), delay(1))));
-    dirtyUI$.subscribe(_ => jQueryObject.markAsDirty());
-}
-/**
- * If checked, returns input's value, otherwise returns hidden namesake's value.
- */
-function getCheckboxValue(jQueryObject) {
-    let selectedFormControls = Array.isArray(jQueryObject) ? jQueryObject.map(e => e[0]) : jQueryObject.toArray();
-    let isChecked = selectedFormControls.some(element => element.checked);
-    if (isChecked)
-        return selectedFormControls.find(element => element.checked).value; //val() would cause a loop
-    else {
-        let hiddenNamesake = selectedFormControls.find(element => element.getAttribute('type') == 'hidden');
-        return hiddenNamesake ? hiddenNamesake.value.toString() : null;
-    }
-}
-/*========================== Private Part ==========================*/
-/**
- * Gets the value of the form control as string, if it's a single element, or as key value pair of field names and their values, if it's not a single element.
- */
-function getFormControlValue(jQueryObject) {
-    let selectedFormControls = jQueryObject.selectedFormControls;
-    let result = {};
-    // Handle checkboxes and radios 
-    let namesakes = selectedFormControls.reduce((acc, curr) => {
-        let name = curr.attr('name');
-        acc[name] ? acc[name].push(curr) : (acc[name] = [curr]);
-        return acc;
-    }, {});
-    for (let name in namesakes) {
-        let formControls = namesakes[name];
-        let areCheckboxes = formControls[0].attr('type') === 'checkbox';
-        let areRadios = formControls[0].attr('type') === 'radio';
-        result[name] = !areCheckboxes && !areRadios
-            ? formControls[formControls.length - 1][0].value // normal input
-            : areCheckboxes
-                ? getCheckboxValue(formControls) // checkbox
-                : formControls[0].filter(':checked')[0].value; // radio
-    }
-    // If only one namesake set is selected return its value (TODO: check what was this condition below)
-    // if (Object.keys(namesakes).length === 1 && selectedFormControls.length === Object.values(namesakes).map((elements: []) => elements.length).reduce((acc, curr) => acc + curr, 0)) {
-    if (Object.keys(namesakes).length === 1)
-        return Object.values(result)[0];
-    return result;
-}
-/**
- * Finds the cached version of the form control / group and returns it, otherwise returns null.
- *
- * Elements are checked using their selectedFormControls array, so it check an up-to-date version of a form group;
- * @param jQueryObject
- */
-function findCachedElement(jQueryObject) {
-    var _a;
-    return (_a = cachedControlsAndGroups
-        .find($cachedFormControl => $cachedFormControl.selectedFormControls.length === jQueryObject.length
-        && $cachedFormControl.selectedFormControls
-            .flatMap($e => $e.toArray())
-            .every(element => jQueryObject.toArray().includes(element)))) !== null && _a !== void 0 ? _a : null;
-}
-/**
- * Adds the provided form control to the cache.
- * @see findCachedElement()
- */
-function addToCache(jQueryObject) {
-    cachedControlsAndGroups.push(jQueryObject);
-}
-function isGroupSelected(jQueryObject) {
-    return jQueryObject.toArray().filter(singleJQueryObject => isFormControlType(singleJQueryObject)).length > 1 && !checkIfRadioGroup(jQueryObject) || jQueryObject[0] instanceof HTMLFormElement;
-}
-/**
- * Adds properties for touched - untouched, dirty - pristine.
- * @param jQueryObject
- */
-function addComplementaryGettersSetters(jQueryObject) {
-    // touched
-    Object.defineProperty(jQueryObject, 'touched', {
-        get() {
-            return this._touched;
-        },
-        set(value) {
-            this._touched = value;
-            this._untouched = !value;
-        }
-    });
-    // untouched
-    Object.defineProperty(jQueryObject, 'untouched', {
-        get() {
-            return this._untouched;
-        },
-        set(value) {
-            this._untouched = value;
-            this._touched = !value;
-        }
-    });
-    // dirty
-    Object.defineProperty(jQueryObject, 'dirty', {
-        get() {
-            return this._dirty;
-        },
-        set(value) {
-            this._dirty = value;
-            this._pristine = !value;
-        }
-    });
-    // pristine
-    Object.defineProperty(jQueryObject, 'pristine', {
-        get() {
-            return this._pristine;
-        },
-        set(value) {
-            this._pristine = value;
-            this._dirty = !value;
-        }
-    });
-}
+registerInputToGroupTransformation(migrateValidationToNewGroup);
 
 /**
  * @suppress {checkTypes,constantProperty,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
@@ -5361,8 +5528,16 @@ class Validators {
      *
      */
     static required($control) {
-        let isRadioControl = checkIfRadioGroup($control);
-        return isRadioControl && $control.toArray().every(element => !element.checked) || !isRadioControl && isNullOrWhitespace($control.val()) ? { 'required': true } : null;
+        let isRadioControl = checkIfRadioControl($control);
+        let isCheckboxControl = checkIfCheckboxControl($control);
+        let hasValue = true;
+        if (isRadioControl && $control.toArray().every(element => !element.checked))
+            hasValue = false;
+        else if (isCheckboxControl && $control.filter('[type=checkbox]').is(':checked') === false)
+            hasValue = false;
+        else if (!isRadioControl && !isCheckboxControl && isNullOrWhitespace($control.value))
+            hasValue = false;
+        return hasValue ? null : { 'required': true };
     }
     /**
      * \@description
@@ -5640,7 +5815,204 @@ function _mergeErrors(arrayOfErrors) {
     return Object.keys(res).length === 0 ? null : res;
 }
 
+function extendFormElements() {
+    let baseAttrFn = jQuery.fn.attr;
+    let baseRemoveAttr = jQuery.fn.removeAttr;
+    let baseValFn = jQuery.fn.val;
+    jQuery.fn.extend({
+        val(value) {
+            // Gets the value
+            if (value === undefined) {
+                if (this.isFormGroup || this.isFormControl)
+                    return this.value;
+                return baseValFn.apply(this, arguments);
+            }
+            // Sets the value (functions not yet supported)
+            if (!(value instanceof Function)) {
+                let result = baseValFn.apply(this, arguments);
+                if (this.isFormControl || this.isFormGroup)
+                    this.valueChangesSubject.next(value);
+                else if (this.length === 1 && isValidFormControl(this[0])) {
+                    let cachedFormControl = findCachedElement(this);
+                    if (cachedFormControl)
+                        cachedFormControl.valueChangesSubject.next(value);
+                }
+                return result;
+            }
+            // If its sets a function, return default
+            return baseValFn.apply(this, arguments);
+        },
+        attr(attributeName, value) {
+            let result = baseAttrFn.apply(this, arguments);
+            // Handle setting of disabled and type attributes
+            if (attributeName !== 'disabled' && attributeName !== 'type' || value === undefined)
+                return result;
+            this.each(function () {
+                if (value instanceof Function)
+                    return;
+                let control = this.isFormControl || this.isFormGroup ? this : findCachedElement(this);
+                if (!control)
+                    return;
+                if (attributeName === 'disabled')
+                    control.disabledSubject.next(value != null);
+                else if (attributeName === 'type' && [control[0].type, value].some(e => e === 'hidden') && [control[0].type, value].some(e => e !== 'hidden'))
+                    control.updateValidity();
+            });
+            return result;
+        },
+        removeAttr(attributeName) {
+            let result = baseRemoveAttr.apply(this, arguments);
+            if (attributeName !== 'disabled')
+                return result;
+            this.each(function () {
+                let control = this.isFormControl || this.isFormGroup ? this : findCachedElement(this);
+                if (!control)
+                    return;
+                control.disabledSubject.next(false);
+            });
+            return result;
+        },
+        markAsTouched() {
+            this.touched = true;
+            this.touchedSubject.next(true);
+        },
+        markAllAsTouched() {
+            var _a;
+            this.touched = true;
+            this.touchedSubject.next(true);
+            (_a = this.controls) === null || _a === void 0 ? void 0 : _a.forEach($d => $d.markAsTouched());
+        },
+        markAsUntouched() {
+            var _a;
+            this.untouched = true;
+            this.touchedSubject.next(false);
+            (_a = this.controls) === null || _a === void 0 ? void 0 : _a.forEach($d => {
+                $d.untouched = true;
+                $d.touchedSubject.next(false);
+            });
+        },
+        markAsDirty() {
+            var _a;
+            this.dirty = true;
+            (_a = this.dirtySubject) === null || _a === void 0 ? void 0 : _a.next(true);
+        },
+        markAllAsDirty() {
+            var _a;
+            this.markAsDirty();
+            (_a = this.controls) === null || _a === void 0 ? void 0 : _a.forEach($d => $d.markAsDirty());
+        },
+        markAsPristine() {
+            var _a, _b;
+            this.pristine = true;
+            (_a = this.dirtySubject) === null || _a === void 0 ? void 0 : _a.next(false);
+            (_b = this.controls) === null || _b === void 0 ? void 0 : _b.forEach($d => {
+                var _a;
+                $d.pristine = true;
+                (_a = $d === null || $d === void 0 ? void 0 : $d.dirtySubject) === null || _a === void 0 ? void 0 : _a.next(false);
+            });
+        },
+        enableValidation() {
+            return enableValidation(this);
+        },
+        disableValidation() {
+            return disableValidation(this);
+        },
+        setValidators(newValidator) {
+            return setValidators(this, newValidator);
+        },
+        getValidators() {
+            return getValidators(this);
+        },
+        updateValidity() {
+            return updateValidity(this);
+        },
+        hasError(errorCode) {
+            return hasError(this, errorCode);
+        },
+        reset() {
+            this.markAsUntouched();
+            this.markAsPristine();
+            // TODO: handle if there's more than one form
+            if (this[0] instanceof HTMLFormElement) {
+                this[0].reset();
+                return;
+            }
+            this.val('');
+            this.controls.forEach($c => {
+                $c.markAsUntouched();
+                $c.markAsPristine();
+                $c.val('');
+            });
+        },
+        logErrors() {
+            if (this.errors)
+                console.log(this.errors);
+            this.controls.forEach($c => $c.errors != null && console.log($c, $c.errors));
+        },
+        asFormControl(name, valueChangesUI, touchedUI$, dirtyUI$) {
+            return asFormControl(this, name, valueChangesUI, touchedUI$, dirtyUI$);
+        },
+        asFormGroup(valueChangesUI, touchedUI$, dirtyUI$) {
+            return asFormGroup(this, valueChangesUI, touchedUI$, dirtyUI$);
+        },
+        valueMap(mapFn) {
+            this.valueMapFn = mapFn;
+            return this;
+        },
+        destroyControl() {
+            return destroyControl(this);
+        },
+        destroyGroup() {
+            return destroyGroup(this);
+        }
+    });
+    /*===== Constructor =====*/
+    jQuery.fn.init = overriddenConstructor;
+    $(_ => {
+        let controlRemovalObserver = new MutationObserver(entries => {
+            // TODO: optimize bu providing ignore array in config
+            console.time('mutation');
+            /*** Form controls, from removed nodes, are removed from cache and groups  ***/
+            let removedHtmlElements = entries.flatMap(entry => [...entry.removedNodes].filter(node => node instanceof HTMLElement));
+            let removedControls = removedHtmlElements.flatMap(e => findFormControls(e, true));
+            // Remove empty controls
+            if (removedControls.length > 0) {
+                let cachedControlsToRemove = [];
+                for (let cachedElement of cachedControlsAndGroups) {
+                    if (cachedElement.isFormControl && removedControls.includes(cachedElement[0]))
+                        cachedControlsToRemove.push(cachedElement);
+                    else if (cachedElement.isFormGroup && cachedElement.controls.some($e => removedControls.includes($e[0])))
+                        cachedElement.controls = cachedElement.controls.filter($e => !removedControls.includes($e[0]));
+                }
+                // Expunge added properties and methods
+                cachedControlsToRemove.forEach(element => element.destroyControl());
+            }
+            /*** Form controls, from added nodes, are added to groups that have selected those nodes or their parents ***/
+            let addedHtmlElements = entries.flatMap(entry => [...entry.addedNodes].filter(node => node instanceof HTMLElement));
+            let addedControlsInElements = addedHtmlElements.map(element => ({ element, controls: findFormControls(element) })).filter(_ => _.controls.length > 0);
+            if (addedControlsInElements.length > 0) {
+                let cachedGroupsWithNonControlSelectors = cachedControlsAndGroups
+                    .filter(element => element.isFormGroup)
+                    .map(element => ({ element, nonControls: [...element].filter(e => !isValidFormControl(e)) }))
+                    .filter(_ => _.nonControls.length > 0);
+                for (let cachedGroup of cachedGroupsWithNonControlSelectors) {
+                    let addedToGroup = addedControlsInElements
+                        .filter(addedControlsInElement => cachedGroup.nonControls.some(nonControl => nonControl.contains(addedControlsInElement.element)))
+                        .flatMap(addedControls => addedControls.controls);
+                    if (addedToGroup.length === 0)
+                        continue;
+                    // Function returns false if controls belong to the same control
+                    let controls = combineControls(addedToGroup.map(e => e)) || [$(addedToGroup)];
+                    cachedGroup.element.controls = [...cachedGroup.element.controls, ...controls];
+                }
+            }
+            console.timeEnd('mutation');
+        });
+        controlRemovalObserver.observe(document.body, { childList: true, subtree: true });
+    });
+}
+
 extendFormElements();
 
-export { FormControlStatusEnum as FormControlStatus, Validators, cachedControlsAndGroups, checkIfRadioGroup, convertToFormControl, extractRadioGroups, getCheckboxValue, isFormControlType, isNullOrWhitespace, registerAttributeValidators };
+export { FormControlStatusEnum as FormControlStatus, Validators, addToCache, cachedControlsAndGroups, checkIfCheckboxControl, checkIfRadioControl, combineControls, combineRadiosAndCheckboxes, convertArrayToJson, findCachedElement, findFormControls, fromFullVisibility, fromResize, getCheckboxElements, getCheckboxValue, getRadioValue, isNullOrWhitespace, isValidFormControl, registerAttributeValidators, removeFromCache };
 //# sourceMappingURL=index.js.map

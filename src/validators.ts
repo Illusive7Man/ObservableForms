@@ -9,7 +9,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {checkIfRadioGroup, isNullOrWhitespace as isEmptyInputValue} from "./misc";
+import {checkIfCheckboxControl, checkIfRadioControl, isNullOrWhitespace as isEmptyInputValue} from "./misc";
 
 /**
  * A regular expression that matches valid e-mail addresses.
@@ -153,8 +153,18 @@ export class Validators {
      *
      */
     static required($control) {
-        let isRadioControl = checkIfRadioGroup($control);
-        return isRadioControl && $control.toArray().every(element => !element.checked) || !isRadioControl && isEmptyInputValue($control.val()) ? { 'required': true } : null;
+        let isRadioControl = checkIfRadioControl($control);
+        let isCheckboxControl = checkIfCheckboxControl($control);
+
+        let hasValue = true;
+        if (isRadioControl && $control.toArray().every(element => !element.checked))
+            hasValue = false;
+        else if (isCheckboxControl && $control.filter('[type=checkbox]').is(':checked') === false)
+            hasValue = false;
+        else if (!isRadioControl && !isCheckboxControl && isEmptyInputValue($control.value))
+            hasValue = false;
+
+        return hasValue ? null : { 'required': true };
     }
     /**
      * \@description

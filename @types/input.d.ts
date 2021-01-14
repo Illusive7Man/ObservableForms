@@ -23,9 +23,23 @@ declare global {
     abstract class JQuery<TElement = HTMLElement> implements JQueryOriginal<FormControlType> {
 
         /**
-         * Converts a jQuery object to either form control or form group, depending on whether one or multiple input elements is selected.
-         * Form control, or form groups' descendants which are form controls, are added to the {@link JQuery.selectedFormControls} array,
-         * and each have been attached with the properties for:
+         * Converts a jQuery object to a form control,
+         * or returns the cached version if the same element is already being used as a control.
+         * Form control has properties for:
+         *  - observing values, {@link JQuery.valueChanges}
+         *  - checking whether user's changed the value, {@link JQuery.dirty}
+         *  - checking whether user's interacted any way with the control, {@link JQuery.touched}
+         * @param name Name of the form control.
+         * @param valueChangesUI Observable to use for observing values, instead of the default `valueChanges`. Note: `val(value)` will also make it emit values.
+         * @param touchedUI$ Sets `touched = true` every time it emits.
+         * @param dirtyUI$ Sets `dirty = true` every time it emits.
+         */
+        asFormControl(name?: string, valueChangesUI?: Observable<any>, touchedUI$?: Observable<void>, dirtyUI$?: Observable<void>): JQuery<FormControlType>;
+        /**
+         * Converts a jQuery object to a form group,
+         * or returns the cached version if the same selection of elements is already being used as a group.
+         * Form groups' descendants which are form controls, are added to the {@link JQuery.controls} array,
+         * and group and its controls have been attached with the properties for:
          *  - observing values, {@link JQuery.valueChanges}
          *  - checking whether user's changed the value, {@link JQuery.dirty}
          *  - checking whether user's interacted any way with the control, {@link JQuery.touched}
@@ -33,7 +47,7 @@ declare global {
          * @param touchedUI$ Sets `touched = true` every time it emits.
          * @param dirtyUI$ Sets `dirty = true` every time it emits.
          */
-        convertToFormControl(valueChangesUI?: Observable<any>, touchedUI$?: Observable<void>, dirtyUI$?: Observable<void>): JQuery<FormControlType | HTMLFormElement>;
+        asFormGroup(valueChangesUI?: Observable<any>, touchedUI$?: Observable<void>, dirtyUI$?: Observable<void>): JQuery<FormControlType | HTMLFormElement>;
         /**
          * @description
          * Reports the value of the control if it is present, otherwise null.
@@ -113,6 +127,11 @@ declare global {
          */
         readonly valueChanges: Observable<any>;
         /**
+         * Applies provided mapping function to the calculated value of the control / group.
+         * @param mapFn Function that maps from the calculated value to the new value.
+         */
+        valueMap(mapFn: (value: any) => any): JQuery<FormControlType | HTMLFormElement>;
+        /**
          * A multicasting observable that emits an event every time the validation `status` of the control
          * recalculates.
          *
@@ -120,11 +139,10 @@ declare global {
          *
          */
         readonly statusChanges: Observable<FormControlStatus>;
-        readonly statusChangesSubject: Subject<FormControlStatus>;
         /**
          * Starts tracking validity of the field(s) and creates notifications in the UI.
          */
-        enableValidation(): void;
+        enableValidation(): JQuery<FormControlType | HTMLFormElement>;
         /**
          * Stops tracking validity of the field(s) and creates notifications in the UI.
          */
@@ -190,18 +208,6 @@ declare global {
          * @see `markAsDirty()`
          */
         markAsPristine(): void;
-
-        /**
-         * Subject for emitting  dirty / pristine state.
-         *
-         */
-        readonly dirtySubject: Subject<boolean>;
-        /**
-         * Subject for emitting  touched / untouched state.
-         *
-         */
-        readonly touchedSubject: Subject<boolean>;
-
         /**
          * Sets the synchronous validators that are active on this control.  Calling
          * this overwrites any existing sync validators.
@@ -242,7 +248,15 @@ declare global {
         /**
          * List of selected elements. Useful when selector has multiple results.
          */
-        selectedFormControls: JQuery<FormControlType>[];
+        controls: JQuery<FormControlType>[];
+        /**
+         * Removes added properties from control and stops observing its (listening for) events.
+         */
+        destroyControl(): void;
+        /**
+         * Removes added properties from group and its controls and stops observing their (listening for) events.
+         */
+        destroyGroup(): void;
     }
 }
 
@@ -267,22 +281,37 @@ declare namespace JQueryInternal {
         dirty: boolean;
         touched: boolean;
         untouched: boolean;
+        /**
+         * Subject for emitting  dirty / pristine state.
+         *
+         */
+        dirtySubject: Subject<boolean>;
+        /**
+         * Subject for emitting  touched / untouched state.
+         *
+         */
+        touchedSubject: Subject<boolean>;
+        /**
+         * Subject for emitting  disabled / enabled state.
+         *
+         */
+        disabledSubject: Subject<boolean>;
+        isValidationEnabled: boolean;
         status: FormControlStatus;
         valueChanges: Observable<any>;
         valueChangesSubject: Subject<any>;
+        valueMapFn: (value: any) => any;
         statusChanges: Observable<FormControlStatus>;
-        statusChangesSubject: Subject<FormControlStatus>;
         /**
          * Used to programatically update the validity of the form control.
          */
         manualValidityUpdateSubject: Subject<void>;
-        dirtySubject: Subject<boolean>;
-        touchedSubject: Subject<boolean>;
         _validators: ValidatorFn[] | null;
         public _setInitialStatus;
         public _existingValidationSubscription;
-        selectedFormControls: JQueryInternal<FormControlType>[];
-        selectedFormControlsSubject: BehaviorSubject<JQueryInternal<FormControlType>[]>;
-        selectedFormControls$: Observable<JQueryInternal<FormControlType>[]>;
+        _controls: JQueryInternal<FormControlType>[];
+        controls: JQueryInternal<FormControlType>[];
+        controlsSubject: BehaviorSubject<JQueryInternal<FormControlType>[]>;
+        controls$: Observable<JQueryInternal<FormControlType>[]>;
     }
 }
