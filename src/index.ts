@@ -1,6 +1,7 @@
-export { registerAttributeValidators } from './validation';
-export * from './misc';
-export {Validators} from './validators';
+export {registerAttributeValidators} from './validation/validation';
+export {Validators} from './validation/validators';
+export * from './common/misc';
+export {ConfigService} from './common/config';
 
 import {extendFormElements} from './jQueryExtend';
 extendFormElements();

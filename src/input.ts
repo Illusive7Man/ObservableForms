@@ -1,19 +1,17 @@
 ﻿import {BehaviorSubject, fromEvent, merge, Observable, Subject} from "rxjs";
 import {delay, distinctUntilChanged, filter, map, share, skip, startWith, switchMap, tap} from "rxjs/operators";
 import {
-    addToCache,
     checkIfCheckboxControl,
     checkIfRadioControl, combineControls,
     combineRadiosAndCheckboxes, convertArrayToJson,
-    findCachedElement,
     getCheckboxElements,
     getCheckboxValue,
     getRadioValue,
-    isValidFormControl,
-    removeFromCache
-} from "./misc";
+    isValidFormControl
+} from "./common/misc";
 import JQuery = JQueryInternal.JQueryInternal;
 import {JQueryInternal} from "../@types/input";
+import {addToCache, findCachedElement, removeFromCache} from "./common/cache";
 
 
 let originalInit = (jQuery.fn as any).init;

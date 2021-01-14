@@ -4718,44 +4718,6 @@ function removeEmptyArrayElements(object) {
     }
     return object;
 }
-/*========================== Cache ==========================*/
-/**
- * Caches form controls so they are not initialized again.
- * Note: Declared in misc.ts so it's available in both input and validation.
- */
-const cachedControlsAndGroups = [];
-/**
- * Finds the cached version of the form control / group and returns it, otherwise returns null.
- *
- * Elements are matched by element(s) they select, i.e. control is matched if its element(s) have been previously selected,
- * and group is matched if all of its control and non-control elements have been previously selected.
- * @param object A jQueryObject whose selection is matched, or a HTMLElement to check if some cached element has selected it.
- */
-function findCachedElement(object) {
-    var _a;
-    let selectedElements = object instanceof HTMLElement ? [object] : [...object];
-    return (_a = cachedControlsAndGroups
-        .find($cachedElement => $cachedElement.length === selectedElements.length
-        && [...$cachedElement].every(element => selectedElements.includes(element)))) !== null && _a !== void 0 ? _a : null;
-}
-/**
- * Adds the provided form control / group to the cache.
- * @see findCachedElement()
- */
-function addToCache(jQueryObject) {
-    cachedControlsAndGroups.push(jQueryObject);
-}
-/**
- * Removes the provided form control / group from the cache.
- * @param jQueryObject A form control / group object, not a vanilla jQuery object.
- */
-function removeFromCache(jQueryObject) {
-    let cachedElement = findCachedElement(jQueryObject);
-    if (cachedElement == null)
-        return;
-    let index = cachedControlsAndGroups.indexOf(cachedElement);
-    cachedControlsAndGroups.splice(index, 1);
-}
 /*========================== Enums ==========================*/
 const FormControlStatusEnum = {
     VALID: 'VALID',
@@ -4794,6 +4756,45 @@ function fromResize(target) {
         resizeObserver.observe(target);
         subscriber.add(_ => resizeObserver.disconnect());
     });
+}
+
+/*========================== Cache ==========================*/
+/**
+ * Caches form controls so they are not initialized again.
+ * Note: Declared in misc.ts so it's available in both input and validation.
+ */
+const cachedControlsAndGroups = [];
+/**
+ * Finds the cached version of the form control / group and returns it, otherwise returns null.
+ *
+ * Elements are matched by element(s) they select, i.e. control is matched if its element(s) have been previously selected,
+ * and group is matched if all of its control and non-control elements have been previously selected.
+ * @param object A jQueryObject whose selection is matched, or a HTMLElement to check if some cached element has selected it.
+ */
+function findCachedElement(object) {
+    var _a;
+    let selectedElements = object instanceof HTMLElement ? [object] : [...object];
+    return (_a = cachedControlsAndGroups
+        .find($cachedElement => $cachedElement.length === selectedElements.length
+        && [...$cachedElement].every(element => selectedElements.includes(element)))) !== null && _a !== void 0 ? _a : null;
+}
+/**
+ * Adds the provided form control / group to the cache.
+ * @see findCachedElement()
+ */
+function addToCache(jQueryObject) {
+    cachedControlsAndGroups.push(jQueryObject);
+}
+/**
+ * Removes the provided form control / group from the cache.
+ * @param jQueryObject A form control / group object, not a vanilla jQuery object.
+ */
+function removeFromCache(jQueryObject) {
+    let cachedElement = findCachedElement(jQueryObject);
+    if (cachedElement == null)
+        return;
+    let index = cachedControlsAndGroups.indexOf(cachedElement);
+    cachedControlsAndGroups.splice(index, 1);
 }
 
 let originalInit = jQuery.fn.init;
@@ -5815,6 +5816,26 @@ function _mergeErrors(arrayOfErrors) {
     return Object.keys(res).length === 0 ? null : res;
 }
 
+/**
+ * Used for global configuration.
+ */
+class ConfigService {
+}
+/**
+ * Observe changes in DOM, adding and removing of nodes,
+ * to update lists of controls in initialized groups.
+ *
+ * Example: adding an input element in a subtree of a form group will add it to the group.
+ */
+ConfigService.useMutationObservers = true;
+/**
+ * List of selectors that will make any new, or removed, html element that matches any of them be skipped over
+ * in Mutation observer's scan for changes in controls.
+ *
+ * This is a performance config and it is not required in 99% of cases.
+ */
+ConfigService.excludedObserverElements = ['span.popper.validation'];
+
 function extendFormElements() {
     let baseAttrFn = jQuery.fn.attr;
     let baseRemoveAttr = jQuery.fn.removeAttr;
@@ -5969,11 +5990,17 @@ function extendFormElements() {
     /*===== Constructor =====*/
     jQuery.fn.init = overriddenConstructor;
     $(_ => {
+        /**
+         * Used for updating list of existing controls, disposing the removed ones,
+         * and updating the list of controls selected by a group.
+         */
         let controlRemovalObserver = new MutationObserver(entries => {
-            // TODO: optimize bu providing ignore array in config
-            console.time('mutation');
+            if (ConfigService.useMutationObservers === false)
+                return;
             /*** Form controls, from removed nodes, are removed from cache and groups  ***/
-            let removedHtmlElements = entries.flatMap(entry => [...entry.removedNodes].filter(node => node instanceof HTMLElement));
+            let removedHtmlElements = entries.flatMap(entry => [...entry.removedNodes]
+                .filter(node => node instanceof HTMLElement)
+                .filter((element) => ConfigService.excludedObserverElements.every(selector => !element.matches(selector))));
             let removedControls = removedHtmlElements.flatMap(e => findFormControls(e, true));
             // Remove empty controls
             if (removedControls.length > 0) {
@@ -5988,7 +6015,9 @@ function extendFormElements() {
                 cachedControlsToRemove.forEach(element => element.destroyControl());
             }
             /*** Form controls, from added nodes, are added to groups that have selected those nodes or their parents ***/
-            let addedHtmlElements = entries.flatMap(entry => [...entry.addedNodes].filter(node => node instanceof HTMLElement));
+            let addedHtmlElements = entries.flatMap(entry => [...entry.addedNodes]
+                .filter(node => node instanceof HTMLElement)
+                .filter((element) => ConfigService.excludedObserverElements.every(selector => !element.matches(selector))));
             let addedControlsInElements = addedHtmlElements.map(element => ({ element, controls: findFormControls(element) })).filter(_ => _.controls.length > 0);
             if (addedControlsInElements.length > 0) {
                 let cachedGroupsWithNonControlSelectors = cachedControlsAndGroups
@@ -6006,7 +6035,6 @@ function extendFormElements() {
                     cachedGroup.element.controls = [...cachedGroup.element.controls, ...controls];
                 }
             }
-            console.timeEnd('mutation');
         });
         controlRemovalObserver.observe(document.body, { childList: true, subtree: true });
     });
@@ -6014,5 +6042,4 @@ function extendFormElements() {
 
 extendFormElements();
 
-export { FormControlStatusEnum as FormControlStatus, Validators, addToCache, cachedControlsAndGroups, checkIfCheckboxControl, checkIfRadioControl, combineControls, combineRadiosAndCheckboxes, convertArrayToJson, findCachedElement, findFormControls, fromFullVisibility, fromResize, getCheckboxElements, getCheckboxValue, getRadioValue, isNullOrWhitespace, isValidFormControl, registerAttributeValidators, removeFromCache };
-//# sourceMappingURL=index.js.map
+export { ConfigService, FormControlStatusEnum as FormControlStatus, Validators, checkIfCheckboxControl, checkIfRadioControl, combineControls, combineRadiosAndCheckboxes, convertArrayToJson, findFormControls, fromFullVisibility, fromResize, getCheckboxElements, getCheckboxValue, getRadioValue, isNullOrWhitespace, isValidFormControl, registerAttributeValidators };

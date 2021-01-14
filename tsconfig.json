@@ -11,8 +11,7 @@
     "module": "ES6",
     "moduleResolution": "node",
     "declaration": true,
-    "outDir": "lib",
-    "sourceMap": true
+    "outDir": "lib"
   },
   "compileOnSave": true,
   "include": [

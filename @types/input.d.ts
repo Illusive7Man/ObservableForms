@@ -1,7 +1,4 @@
 import {BehaviorSubject, Observable, Subject} from "rxjs";
-// @ts-ignore
-import {JQuery as JQueryOriginal} from '@types/jquery/JQuery';
-import {Instance as PopperInstance} from '@popperjs/core';
 
 declare global {
     type FormControlType = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
@@ -20,7 +17,7 @@ declare global {
         DISABLED = 'DISABLED'
     }
 
-    abstract class JQuery<TElement = HTMLElement> implements JQueryOriginal<FormControlType> {
+    abstract class JQuery<TElement = HTMLElement> {
 
         /**
          * Converts a jQuery object to a form control,
@@ -235,7 +232,7 @@ declare global {
 
         protected _setInitialStatus;
         protected _existingValidationSubscription;
-        validityPopper: PopperInstance;
+        validityPopper: import('@popperjs/core').Instance;
         /**
          * Indicates whether validation errors are currently shown to the user.
          *

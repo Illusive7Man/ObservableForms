@@ -5,12 +5,13 @@ import preventOverflow from '@popperjs/core/lib/modifiers/preventOverflow.js';
 import offset from '@popperjs/core/lib/modifiers/offset.js';
 import {Options} from '@popperjs/core/lib/modifiers/offset';
 import {BehaviorSubject, fromEvent, merge, NEVER, of, Subject} from "rxjs";
-import {checkIfRadioControl, FormControlStatus, isValidFormControl, cachedControlsAndGroups, checkIfCheckboxControl} from "./misc";
+import {checkIfRadioControl, FormControlStatus, isValidFormControl, checkIfCheckboxControl} from "../common/misc";
 import JQuery = JQueryInternal.JQueryInternal;
-import {JQueryInternal} from "../@types/input";
-import {fromFullVisibility} from "./observables/fromFullVisibility";
-import {fromResize} from "./observables/fromResize";
-import {registerInputToGroupTransformation} from "./input";
+import {JQueryInternal} from "../../@types/input";
+import {fromFullVisibility} from "../observables/fromFullVisibility";
+import {fromResize} from "../observables/fromResize";
+import {registerInputToGroupTransformation} from "../input";
+import {cachedControlsAndGroups} from "../common/cache";
 
 /*========================== Public API ==========================*/
 

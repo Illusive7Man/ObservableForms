@@ -9,7 +9,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {checkIfCheckboxControl, checkIfRadioControl, isNullOrWhitespace as isEmptyInputValue} from "./misc";
+import {checkIfCheckboxControl, checkIfRadioControl, isNullOrWhitespace as isEmptyInputValue} from "../common/misc";
 
 /**
  * A regular expression that matches valid e-mail addresses.

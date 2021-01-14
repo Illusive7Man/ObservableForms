@@ -1,8 +1,10 @@
-import {cachedControlsAndGroups, combineControls, findCachedElement, findFormControls, FormControlStatus, isValidFormControl, removeFromCache} from "./misc";
-import {disableValidation, enableValidation, getValidators, hasError, setValidators, updateValidity} from "./validation";
+import {combineControls, findFormControls, FormControlStatus, isValidFormControl} from "./common/misc";
+import {disableValidation, enableValidation, getValidators, hasError, setValidators, updateValidity} from "./validation/validation";
 import {Observable} from "rxjs";
 import {asFormControl, asFormGroup, destroyControl, destroyGroup, overriddenConstructor} from "./input";
 import {JQueryInternal} from "../@types/input";
+import {cachedControlsAndGroups, findCachedElement, removeFromCache} from "./common/cache";
+import {ConfigService} from "./common/config";
 
 export function extendFormElements(): void {
     let baseAttrFn = jQuery.fn.attr;
@@ -184,14 +186,21 @@ export function extendFormElements(): void {
 
     $(_ => {
 
+        /**
+         * Used for updating list of existing controls, disposing the removed ones,
+         * and updating the list of controls selected by a group.
+         */
         let controlRemovalObserver = new MutationObserver(entries => {
-            // TODO: optimize bu providing ignore array in config
 
-            console.time('mutation');
+            if (ConfigService.useMutationObservers === false)
+                return;
 
             /*** Form controls, from removed nodes, are removed from cache and groups  ***/
 
-            let removedHtmlElements = (<HTMLElement[]>entries.flatMap(entry => [...entry.removedNodes].filter(node => node instanceof HTMLElement)));
+            let removedHtmlElements = (<HTMLElement[]>entries.flatMap(entry => [...entry.removedNodes]
+                .filter(node => node instanceof HTMLElement)
+                .filter((element: HTMLElement) => ConfigService.excludedObserverElements.every(selector => !element.matches(selector)))));
+
             let removedControls = removedHtmlElements.flatMap(e => findFormControls(e, true));
 
             // Remove empty controls
@@ -215,7 +224,10 @@ export function extendFormElements(): void {
 
             /*** Form controls, from added nodes, are added to groups that have selected those nodes or their parents ***/
 
-            let addedHtmlElements = (<HTMLElement[]>entries.flatMap(entry => [...entry.addedNodes].filter(node => node instanceof HTMLElement)));
+            let addedHtmlElements = (<HTMLElement[]>entries.flatMap(entry => [...entry.addedNodes]
+                .filter(node => node instanceof HTMLElement)
+                .filter((element: HTMLElement) => ConfigService.excludedObserverElements.every(selector => !element.matches(selector)))));
+
             let addedControlsInElements = addedHtmlElements.map(element => ({element, controls: findFormControls(element)})).filter(_ => _.controls.length > 0);
 
             if (addedControlsInElements.length > 0) {
@@ -240,7 +252,6 @@ export function extendFormElements(): void {
                 }
             }
 
-            console.timeEnd('mutation');
         });
 
         controlRemovalObserver.observe(document.body, {childList: true, subtree: true});
