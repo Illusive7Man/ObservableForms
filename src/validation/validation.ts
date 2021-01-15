@@ -1,67 +1,73 @@
-﻿import {debounceTime, delay, distinctUntilChanged, filter, map, share, shareReplay, skip, startWith, switchMap, take, takeWhile, tap} from "rxjs/operators";
+﻿import {debounceTime, delay, distinctUntilChanged, filter, map, share, shareReplay, startWith, switchMap, take, takeWhile, tap} from "rxjs/operators";
 import {createPopperLite as createPopper, Modifier, Placement} from "@popperjs/core/dist/esm";
 import flip from '@popperjs/core/lib/modifiers/flip.js';
 import preventOverflow from '@popperjs/core/lib/modifiers/preventOverflow.js';
 import offset from '@popperjs/core/lib/modifiers/offset.js';
 import {Options} from '@popperjs/core/lib/modifiers/offset';
 import {BehaviorSubject, fromEvent, merge, NEVER, of, Subject} from "rxjs";
-import {cachedFormControls, checkIfRadioGroup, isFormControlType, FormControlStatus} from "./misc";
+import {checkIfRadioControl, FormControlStatus, isValidFormControl, checkIfCheckboxControl} from "../common/misc";
 import JQuery = JQueryInternal.JQueryInternal;
-import {JQueryInternal} from "../@types/input";
-import {fromFullVisibility} from "./ observable/fromFullVisibility";
-import {fromResize} from "./ observable/fromResize";
+import {JQueryInternal} from "../../@types/input";
+import {fromFullVisibility} from "../observables/fromFullVisibility";
+import {fromResize} from "../observables/fromResize";
+import {registerInputToGroupTransformation} from "../input";
+import {cachedControlsAndGroups} from "../common/cache";
+import {ConfigService} from "../common/config";
 
 /*========================== Public API ==========================*/
 
-export function enableValidation(jQueryObject: JQuery<FormControlType | HTMLFormElement>): void {
+export function enableValidation(jQueryObject: JQuery<FormControlType | HTMLFormElement>): JQuery<FormControlType | HTMLFormElement> {
 
     // Check if it's already enabled
-    if (jQueryObject.valid !== undefined)
+    if (jQueryObject.isValidationEnabled)
         return;
-    
-    // Check if it's actually a form control (maybe it's empty)
-    if (jQueryObject.isFormControl !== true)
-        jQueryObject.convertToFormControl();
 
-    jQueryObject.selectedFormControls$.subscribe(selectedFormControls => 
-        selectedFormControls.filter($formControl => $formControl.valid === undefined && $formControl !== jQueryObject).forEach($formControl => enableValidation($formControl)));
+    // Check if it's actually a form control (maybe it's empty)
+    if (!jQueryObject.isFormControl && !jQueryObject.isFormGroup)
+        jQueryObject = jQueryObject.asFormGroup() as any;
+
+    jQueryObject.controls$.subscribe(controls =>
+        controls.filter($formControl => $formControl.valid === undefined && $formControl !== jQueryObject).forEach($formControl => enableValidation($formControl)));
 
     // valid == true -> invalid = false;
     addValidInvalidGetterSetter(jQueryObject);
 
-    // Programatically update the validity.
+    // Programmatically update the validity.
     jQueryObject.manualValidityUpdateSubject = new Subject<void>();
 
-    if (jQueryObject.selectedFormControls.length === 1)
+    if (jQueryObject.isFormControl)
         setValidationRulesFromAttributes(jQueryObject as JQuery<FormControlType>);
-    
-    let statusChangesSubject = new Subject<FormControlStatus>();
-    jQueryObject.statusChangesSubject = statusChangesSubject;
 
-    let sub1 =
-    jQueryObject.selectedFormControls$.pipe(
-        switchMap(selectedFormControls => merge(
-        selectedFormControls.length === 0 ? NEVER : selectedFormControls.length === 1 ? jQueryObject.valueChanges : merge(...jQueryObject.selectedFormControls.map($formControl => $formControl.statusChanges)).pipe(delay(1)),
-            jQueryObject.manualValidityUpdateSubject.asObservable())
-        ),
+    /*** statusChanges ***/
+    jQueryObject.statusChanges = jQueryObject.controls$.pipe(
+        switchMap(controls => merge(
+        jQueryObject.isFormControl ? jQueryObject.valueChanges : merge(...controls.map($formControl => $formControl.statusChanges)).pipe(delay(1)),
+            jQueryObject.manualValidityUpdateSubject.asObservable(),
+            jQueryObject.disabledSubject
+        ).pipe(startWith(''))),
+        // Note 1: Controls update status on value change
+        // Note 2: Groups when their controls change status (which supersedes valueChanges)
+        // Note 3: startWith() updates validity when the controls array changes
+
         startWith(''),
-        
         tap(_ => jQueryObject.errors = jQueryObject.getValidators()?.map(validatorFn => validatorFn(jQueryObject)).reduce((acc, curr) => curr ? {...acc, ...curr} : acc, null)),
-        
-        map(_ => (jQueryObject.selectedFormControls.length > 1 && jQueryObject.errors) || jQueryObject.selectedFormControls.some($formControl => $formControl.errors && !$formControl.attr('disabled') && !$formControl.is('[type=hidden]'))
-            ? FormControlStatus.INVALID : FormControlStatus.VALID),
-        
-        tap(status => jQueryObject.valid = status === FormControlStatus.VALID)
-    ).subscribe(status => statusChangesSubject.next(status));
+        map(_ => (jQueryObject.isFormGroup && jQueryObject.errors)
+            || jQueryObject.controls.some($formControl => $formControl.errors && !$formControl.attr('disabled') && [...$formControl].some(e => e.getAttribute('type') !== 'hidden'))
+                ? FormControlStatus.INVALID : FormControlStatus.VALID),
+        // Note: Invalid when either object itself or some of the selected non-hidden, non-disabled, controls have errors.
 
-    jQueryObject.statusChanges = statusChangesSubject.asObservable().pipe(share());
-    
+        share()
+    );
+
     // Subscribe for status update
-    jQueryObject.statusChanges.subscribe(status => jQueryObject.status = status);
+    jQueryObject._existingValidationSubscription =
+        jQueryObject.statusChanges.subscribe(status => {jQueryObject.status = status; jQueryObject.valid = status === FormControlStatus.VALID;});
 
-    attachPopper(jQueryObject);
+    // Attach popper
+    if (!jQueryObject[0].matches('dummy-element'))
+        attachPopper(jQueryObject);
 
-    jQueryObject._existingValidationSubscription = sub1;
+    return jQueryObject;
 }
 
 
@@ -78,26 +84,28 @@ export function getValidators(jQueryObject: JQuery<FormControlType>): ValidatorF
     return jQueryObject._validators ?? null;
 }
 
-export function disableValidation(jQueryObject: JQuery<FormControlType>): void {
+export function disableValidation(jQueryObject: JQuery<FormControlType | HTMLFormElement>): JQuery<FormControlType | HTMLFormElement> {
 
     jQueryObject._existingValidationSubscription.unsubscribe();
+    jQueryObject.manualValidityUpdateSubject.complete();
+
     delete jQueryObject._existingValidationSubscription;
-    jQueryObject.statusChangesSubject.complete();
-    delete jQueryObject.statusChangesSubject;
+    delete jQueryObject.manualValidityUpdateSubject;
+    delete jQueryObject.statusChanges;
+
+    jQueryObject.validityPopper.destroy;
+    delete jQueryObject.validityPopper;
+    delete jQueryObject.isValidityMessageShown$;
 
     delete jQueryObject.valid;
     delete jQueryObject.invalid;
-}
+    delete (jQueryObject as any)._valid;
+    delete (jQueryObject as any)._invalid;
+    delete jQueryObject.errors;
+    delete jQueryObject._validators;
+    delete jQueryObject.isValidationEnabled;
 
-
-let registeredAttributeValidators: {[key: string]: ValidatorFn | ValidatorFn[]} = {};
-
-/**
- * Registers validator functions to use on an control that has the specified attribute. You could use this function multiple times, but it won't have an effect on existing form controls.
- * @param attributeValidators Object that has desired attribute names as keys, whose value are validator functions.
- */
-export function registerAttributeValidators(attributeValidators: {[key: string]: ValidatorFn | ValidatorFn[]}): void {
-    registeredAttributeValidators = {...attributeValidators, ...attributeValidators};
+    return jQueryObject;
 }
 
 /**
@@ -131,8 +139,8 @@ export function attachPopper(jQueryObject: JQuery<FormControlType | HTMLFormElem
 
 
     // Control the placement and handle DOM visibility
-    let reference$ = jQueryObject.selectedFormControls$.pipe(
-        filter(selectedFormControls => selectedFormControls.length > 0),
+    let reference$ = jQueryObject.controls$.pipe(
+        filter(controls => controls.length > 0),
         map(_ => determinePopperPositioning(jQueryObject).$reference), shareReplay(1));
 
     // Setup reference element
@@ -140,24 +148,27 @@ export function attachPopper(jQueryObject: JQuery<FormControlType | HTMLFormElem
         $reference.addClass('popper-reference').append($popper);
         jQueryObject.validityPopper.state.elements.reference = $reference[0];
         jQueryObject.validityPopper.update();
-    })
+    });
 
     // Visibility - position/placement update
+    let v$ =
     reference$.pipe(takeWhile(_ => !isPlacedManually), switchMap($reference => fromFullVisibility($reference[0])), takeWhile(_ => !isPlacedManually))
         .subscribe(isFullyVisible => isFullyVisible ? updatePopperPlacement(jQueryObject) : $popper.css('visibility', 'hidden')); // updatePopperPlacement knows about visibility
 
     // Resize - position tracking
     let isFresh = true, isTransition = false;
+    let r$ =
     reference$.pipe(
-        switchMap($reference => fromResize($reference[0])),                                                     // Observe reference's resize
-        tap(_ => isFresh ? (isFresh = false) || jQueryObject.validityPopper.forceUpdate() : isTransition = true), // Do the first one
-        debounceTime(34),                                                                                      // If triggered more than once, debounce 100ms
-        tap(_ => isTransition && jQueryObject.validityPopper.forceUpdate())                                       // and do it one final time
+        switchMap($reference => fromResize($reference[0])),                                                      // Observe reference's resize
+        tap(_ => isFresh ? (isFresh = false) || jQueryObject.validityPopper.forceUpdate() : isTransition = true), // Do the first one (?. - used in teardown)
+        debounceTime(34),                                                                                       // If triggered more than once, debounce 100ms
+        tap(_ => isTransition && jQueryObject.validityPopper.forceUpdate())                                        // and do it one final time
     ).subscribe(_ => (isFresh = true) && (isTransition = false));
 
+    jQueryObject.controls$.subscribe(null, null, () => {v$.unsubscribe(); r$.unsubscribe();});
 
     // Handle display of errors
-    let dirtyObservable$ = jQueryObject.dirtySubject.asObservable().pipe(filter(_ => jQueryObject.selectedFormControls.every($c => $c.dirty)), distinctUntilChanged());
+    let dirtyObservable$ = jQueryObject.dirtySubject.asObservable().pipe(filter(_ => jQueryObject.controls.every($c => $c.dirty)), distinctUntilChanged());
 
     let popperShownSubject = new BehaviorSubject<boolean>(false);
     jQueryObject.isValidityMessageShown$ = popperShownSubject.asObservable().pipe(distinctUntilChanged());
@@ -176,9 +187,9 @@ export function attachPopper(jQueryObject: JQuery<FormControlType | HTMLFormElem
 
             // Show if dirty and invalid (with personal errors) or hide otherwise
             if (jQueryObject.dirty && jQueryObject.invalid && jQueryObject.errors) {
-                
+
                 // Form groups, by default, show their errors once all of their descendants become dirty
-                if (jQueryObject.selectedFormControls.length > 1 && jQueryObject.selectedFormControls.some(formControl => formControl.pristine))
+                if (jQueryObject.controls.length > 1 && jQueryObject.controls.some(formControl => formControl.pristine) && wasValidityMessageShown === false)
                     return;
                     
                 let errorMessage = Object.keys(jQueryObject.errors).map(key => typeof jQueryObject.errors[key] === 'string' ? jQueryObject.errors[key] : validationErrors[key]).join('\n');
@@ -204,22 +215,22 @@ export function attachPopper(jQueryObject: JQuery<FormControlType | HTMLFormElem
 }
 
 export function hasError(jQueryObject: JQuery<FormControlType | HTMLFormElement>, errorCode: string): boolean {
-    return Object.keys(jQueryObject.errors).some(key => key === errorCode);
+    return jQueryObject.errors && Object.keys(jQueryObject.errors).some(key => key === errorCode);
 }
 
 /*========================== Private Part ==========================*/
 
 /**
- * Adds validator functions to the control based on its properties. Works with radios.
+ * Adds validator functions to the control based on its properties. Works with radios and checkboxes.
  * @param $formControl
  */
 function setValidationRulesFromAttributes($formControl: JQuery<FormControlType>): void {
 
     let validators: ValidatorFn[] = [];
 
-    for (let attribute in registeredAttributeValidators)
+    for (let attribute in ConfigService.registeredAttributeValidators)
         if ($formControl.attr(attribute) !== undefined)
-            validators = validators.concat(Array.isArray(registeredAttributeValidators[attribute]) ? registeredAttributeValidators[attribute] as ValidatorFn[] : [registeredAttributeValidators[attribute] as ValidatorFn]);
+            validators = validators.concat(Array.isArray(ConfigService.registeredAttributeValidators[attribute]) ? ConfigService.registeredAttributeValidators[attribute] as ValidatorFn[] : [ConfigService.registeredAttributeValidators[attribute] as ValidatorFn]);
     
 
     if (validators.length > 0)
@@ -238,7 +249,8 @@ function addValidInvalidGetterSetter(jQueryObject: JQuery<FormControlType | HTML
         set(value: JQuery<FormControlType>[]) {
             this._valid = value;
             this._invalid = !value;
-        }
+        },
+        configurable: true
     });
 
     Object.defineProperty(jQueryObject, 'invalid', {
@@ -248,7 +260,15 @@ function addValidInvalidGetterSetter(jQueryObject: JQuery<FormControlType | HTML
         set(value: JQuery<FormControlType>[]) {
             this._invalid = value;
             this._valid = !value;
-        }
+        },
+        configurable: true
+    });
+
+    Object.defineProperty(jQueryObject, 'isValidationEnabled', {
+        get() {
+            return this.valid !== undefined;
+        },
+        configurable: true
     });
 }
 
@@ -268,8 +288,8 @@ function determinePopperPositioning(jQueryObject: JQuery<FormControlType | HTMLF
         if (predefinedPlacement)
             return predefinedPlacement;
 
-        if (jQueryObject.selectedFormControls.length === 1)
-            return hasInputsOnLeft(jQueryObject.selectedFormControls[0], reference) ? 'right' : 'left';
+        if (jQueryObject.isFormControl && reference)
+            return hasInputsOnLeft(jQueryObject.controls[0], reference) ? 'right' : 'left';
 
         return 'left';
     }
@@ -281,9 +301,9 @@ function determinePopperPositioning(jQueryObject: JQuery<FormControlType | HTMLF
         let referenceRect = reference.getBoundingClientRect();
 
         // Form controls that come before current one in DOM.
-        let previousFormControlElements = cachedFormControls.slice(0, cachedFormControls.indexOf($formControl))
+        let previousFormControlElements = cachedControlsAndGroups.slice(0, cachedControlsAndGroups.indexOf($formControl))
             .flatMap($e => $e.toArray())
-            .filter(element => isFormControlType(element));
+            .filter(element => isValidFormControl(element));
 
         return previousFormControlElements.some(previousControl => {
             let previousControlRect = previousControl.getBoundingClientRect();
@@ -297,15 +317,16 @@ function determinePopperPositioning(jQueryObject: JQuery<FormControlType | HTMLF
     // Reference is not predefined, let's find it.
     let $reference: JQuery<HTMLElement>;
 
-    if (jQueryObject.selectedFormControls.length === 1 && checkIfRadioGroup(jQueryObject) === false) {
-        let formControl = jQueryObject.selectedFormControls[0][0];
+    if (jQueryObject.isFormControl && checkIfRadioControl(jQueryObject) === false && checkIfCheckboxControl(jQueryObject) === false) {
+        let formControl = jQueryObject.controls[0][0];
         $reference = $(formControl.parentElement) as any;
 
     } else {
 
-        let references = jQueryObject.selectedFormControls.flatMap($formControl => $formControl.toArray()) // flatMap handles multiple element such as radios
+        let references = jQueryObject.controls.flatMap($formControl => $formControl.toArray()) // flatMap handles multiple element such as radios / checkboxes
             .filter(e => e.getAttribute('type') !== 'hidden')                                         // ignore 'hidden' inputs
-            .map(e => $(e.parentElement));                                                                         // references are parents.
+            .map(e => $(e.parentElement))
+            .filter($e => $e.length > 0);                                                                         // references are parents.
 
         // Find the common ancestor of all the references
         if (references.every($reference => $reference === references[0]))
@@ -314,12 +335,15 @@ function determinePopperPositioning(jQueryObject: JQuery<FormControlType | HTMLF
             $reference = getCommonAncestor(...references);
     }
 
+    // Handle empty controls
+    $reference = $reference ?? $() as any;
+
     return {$reference, placement: determinePlacement(jQueryObject, $reference[0])}
 }
 
 /**
  * Find the element that is a common ancestor of all the proveded objects.
- * Used to find the popper reference of form groups (or radio control).
+ * Used to find the popper reference of form groups (or radio / checkbox control).
  */
 function getCommonAncestor(...objects): JQuery<HTMLElement> {
     let parentsA = getParents(objects[0]);
@@ -331,6 +355,9 @@ function getCommonAncestor(...objects): JQuery<HTMLElement> {
 }
 
 function getParents($element: JQuery<HTMLElement>): HTMLElement[] {
+    if ($element[0] == null)
+        return [];
+
     let isInsideShadowRoot = $element[0].getRootNode() instanceof ShadowRoot;
 
     let parents = $element.parents().toArray();
@@ -359,3 +386,23 @@ async function updatePopperPlacement(jQueryObject: JQuery<FormControlType | HTML
 }
 
 
+/**
+ * Validator functions that came from the attributes stay on the control, other go to the group.
+ * @param $newGroup
+ * @param $oldControl
+ */
+function migrateValidationToNewGroup($newGroup: JQuery<FormControlType | HTMLFormElement>, $oldControl: JQuery<FormControlType>): void {
+
+    let attributeValidators = Object.values(ConfigService.registeredAttributeValidators).flatMap(e => e);
+
+    let validatorsFromAttributes = $newGroup.getValidators().filter(valFn => attributeValidators.includes(valFn));
+    let otherValidators = $newGroup.getValidators().filter(valFn => attributeValidators.includes(valFn) === false);
+
+    $newGroup.setValidators(otherValidators);
+    $oldControl.setValidators(validatorsFromAttributes);
+
+    $newGroup.updateValidity();
+    $oldControl.updateValidity();
+}
+
+registerInputToGroupTransformation(migrateValidationToNewGroup);

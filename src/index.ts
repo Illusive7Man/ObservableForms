@@ -1,7 +1,11 @@
-export { convertToFormControl, getCheckboxValue} from './input';
-export { registerAttributeValidators } from './validation';
-export * from './misc';
-export {Validators} from './validators';
+export {Validators} from './validation/validators';
+export * from './common/misc';
+export {ConfigService} from './common/config';
 
-import {extendFormElements} from './input';
+import {extendFormElements} from './jQueryExtend';
 extendFormElements();
+
+
+/*===== Miscellaneous =====*/
+export {fromFullVisibility} from './observables/fromFullVisibility';
+export {fromResize} from './observables/fromResize';

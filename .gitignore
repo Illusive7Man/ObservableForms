@@ -1,6 +1,7 @@
 # Project exclude paths
 /node_modules/
 /lib
+/dist
 
 .idea
 observable-forms-**.tgz
