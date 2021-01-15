@@ -7,7 +7,12 @@
   "bugs": {
     "url": "https://github.com/Illusive7Man/ObservableForms/issues"
   },
-  "name": "observable-forms",
+  "files": [
+    "css/*",
+    "@types/*",
+    "dist/*",
+    "lib/*"
+  ],
   "dependencies": {
     "@popperjs/core": "^2.5.3",
     "rxjs": "^6.6.3"
@@ -16,6 +21,7 @@
     "@rollup/plugin-node-resolve": "^9.0.0",
     "@rollup/plugin-typescript": "^6.1.0",
     "@types/jquery": "^3.5.5",
+    "@types/resize-observer-browser": "^0.1.4",
     "rollup": "^2.28.1",
     "rollup-plugin-sourcemaps": "^0.6.2",
     "rollup-plugin-terser": "^7.0.2",
@@ -32,7 +38,8 @@
     "reactive"
   ],
   "license": "Apache-2.0",
-  "main": "src/js/index.ts",
+  "main": "lib/index.js",
+  "name": "observable-forms",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Illusive7Man/ObservableForms.git"
@@ -44,5 +51,5 @@
     "bundle:esm:min": "terser --ecma 6 --compress --mangle --module -o dist/index.min.js -- dist/index.js"
   },
   "type": "module",
-  "version": "0.8.2"
+  "version": "0.8.3"
 }

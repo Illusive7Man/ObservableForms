@@ -1,9 +1,9 @@
 ﻿import {BehaviorSubject, EMPTY, fromEvent, merge, Observable, Subject} from "rxjs";
 import {delay, distinctUntilChanged, filter, map, share, skip, switchMap, tap} from "rxjs/operators";
-import {disableValidation, enableValidation, FormControlStatus, getValidators, hasError, setValidators, updateValidity} from "./validation";
-import {checkIfRadioGroup, extractRadioGroups, isFormControlType} from "./misc";
+import {disableValidation, enableValidation, getValidators, hasError, setValidators, updateValidity} from "./validation";
+import {cachedFormControls, checkIfRadioGroup, extractRadioGroups, isFormControlType, FormControlStatus} from "./misc";
 import JQuery = JQueryInternal.JQueryInternal;
-import {JQueryInternal} from "./@types/input";
+import {JQueryInternal} from "../@types/input";
 
 export function extendFormElements(): void {
     let baseAttrFn = jQuery.fn.attr;
@@ -179,7 +179,7 @@ export function extendFormElements(): void {
     }
 
     function isGroupSelected(jQueryObject: JQuery<HTMLElement>): boolean {
-        return jQueryObject.toArray().filter(singleJQueryObject => isFormControlType(singleJQueryObject)).length > 1 || jQueryObject[0] instanceof HTMLFormElement;
+        return jQueryObject.toArray().filter(singleJQueryObject => isFormControlType(singleJQueryObject)).length > 1 && !checkIfRadioGroup(jQueryObject) || jQueryObject[0] instanceof HTMLFormElement;
     }
 }
 
@@ -325,8 +325,6 @@ function getFormControlValue(jQueryObject: JQuery<FormControlType | HTMLFormElem
 
     return result;
 }
-
-const cachedFormControls: JQuery<FormControlType | HTMLFormElement>[] = [];
 
 /**
  * Finds the cached version of the form control and returns it, otherwise returns null.

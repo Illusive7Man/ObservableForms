@@ -1,6 +1,3 @@
-/*========================== Colors ==========================*/
-/*========================== Dimensions ==========================*/
-/*========================== Other ==========================*/
 .popper,
 .tooltip {
   position: absolute;
@@ -10,6 +7,10 @@
   padding: 0;
   text-align: center;
   pointer-events: all;
+}
+
+.popper-reference {
+  position: relative;
 }
 
 .tooltip {
