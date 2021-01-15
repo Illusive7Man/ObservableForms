@@ -12,6 +12,7 @@ import {fromFullVisibility} from "../observables/fromFullVisibility";
 import {fromResize} from "../observables/fromResize";
 import {registerInputToGroupTransformation} from "../input";
 import {cachedControlsAndGroups} from "../common/cache";
+import {ConfigService} from "../common/config";
 
 /*========================== Public API ==========================*/
 
@@ -107,17 +108,6 @@ export function disableValidation(jQueryObject: JQuery<FormControlType | HTMLFor
     return jQueryObject;
 }
 
-
-let registeredAttributeValidators: {[key: string]: ValidatorFn | ValidatorFn[]} = {};
-
-/**
- * Registers validator functions to use on an control that has the specified attribute. You could use this function multiple times, but it won't have an effect on existing form controls.
- * @param attributeValidators Object that has desired attribute names as keys, whose value are validator functions.
- */
-export function registerAttributeValidators(attributeValidators: {[key: string]: ValidatorFn | ValidatorFn[]}): void {
-    registeredAttributeValidators = {...registeredAttributeValidators, ...attributeValidators};
-}
-
 /**
  * Attaches validity popper, which will be displayed when control is dirty and invalid, auto-flip when needed, auto-update whenever reference changes visibility.
  * @param jQueryObject Form control / group the popper attaches to.
@@ -197,9 +187,9 @@ export function attachPopper(jQueryObject: JQuery<FormControlType | HTMLFormElem
 
             // Show if dirty and invalid (with personal errors) or hide otherwise
             if (jQueryObject.dirty && jQueryObject.invalid && jQueryObject.errors) {
-                
+
                 // Form groups, by default, show their errors once all of their descendants become dirty
-                if (jQueryObject.controls.length > 1 && jQueryObject.controls.some(formControl => formControl.pristine))
+                if (jQueryObject.controls.length > 1 && jQueryObject.controls.some(formControl => formControl.pristine) && wasValidityMessageShown === false)
                     return;
                     
                 let errorMessage = Object.keys(jQueryObject.errors).map(key => typeof jQueryObject.errors[key] === 'string' ? jQueryObject.errors[key] : validationErrors[key]).join('\n');
@@ -238,9 +228,9 @@ function setValidationRulesFromAttributes($formControl: JQuery<FormControlType>)
 
     let validators: ValidatorFn[] = [];
 
-    for (let attribute in registeredAttributeValidators)
+    for (let attribute in ConfigService.registeredAttributeValidators)
         if ($formControl.attr(attribute) !== undefined)
-            validators = validators.concat(Array.isArray(registeredAttributeValidators[attribute]) ? registeredAttributeValidators[attribute] as ValidatorFn[] : [registeredAttributeValidators[attribute] as ValidatorFn]);
+            validators = validators.concat(Array.isArray(ConfigService.registeredAttributeValidators[attribute]) ? ConfigService.registeredAttributeValidators[attribute] as ValidatorFn[] : [ConfigService.registeredAttributeValidators[attribute] as ValidatorFn]);
     
 
     if (validators.length > 0)
@@ -345,6 +335,9 @@ function determinePopperPositioning(jQueryObject: JQuery<FormControlType | HTMLF
             $reference = getCommonAncestor(...references);
     }
 
+    // Handle empty controls
+    $reference = $reference ?? $() as any;
+
     return {$reference, placement: determinePlacement(jQueryObject, $reference[0])}
 }
 
@@ -362,6 +355,9 @@ function getCommonAncestor(...objects): JQuery<HTMLElement> {
 }
 
 function getParents($element: JQuery<HTMLElement>): HTMLElement[] {
+    if ($element[0] == null)
+        return [];
+
     let isInsideShadowRoot = $element[0].getRootNode() instanceof ShadowRoot;
 
     let parents = $element.parents().toArray();
@@ -397,7 +393,7 @@ async function updatePopperPlacement(jQueryObject: JQuery<FormControlType | HTML
  */
 function migrateValidationToNewGroup($newGroup: JQuery<FormControlType | HTMLFormElement>, $oldControl: JQuery<FormControlType>): void {
 
-    let attributeValidators = Object.values(registeredAttributeValidators).flatMap(e => e);
+    let attributeValidators = Object.values(ConfigService.registeredAttributeValidators).flatMap(e => e);
 
     let validatorsFromAttributes = $newGroup.getValidators().filter(valFn => attributeValidators.includes(valFn));
     let otherValidators = $newGroup.getValidators().filter(valFn => attributeValidators.includes(valFn) === false);

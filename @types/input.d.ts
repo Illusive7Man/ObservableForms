@@ -1,4 +1,4 @@
-import {BehaviorSubject, Observable, Subject} from "rxjs";
+import {BehaviorSubject, Observable, Subject, Subscription} from "rxjs";
 
 declare global {
     type FormControlType = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
@@ -310,5 +310,6 @@ declare namespace JQueryInternal {
         controls: JQueryInternal<FormControlType>[];
         controlsSubject: BehaviorSubject<JQueryInternal<FormControlType>[]>;
         controls$: Observable<JQueryInternal<FormControlType>[]>;
+        subscriptions: Subscription;
     }
 }

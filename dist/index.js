@@ -1,3 +1,655 @@
+/*========================== Input functionality ==========================*/
+/**
+ * Returns true if it's either HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, or has the `formControl` attribute.
+ */
+function isValidFormControl(htmlElement) {
+    return (htmlElement instanceof HTMLElement) && (htmlElement instanceof HTMLInputElement || htmlElement instanceof HTMLSelectElement || htmlElement instanceof HTMLTextAreaElement
+        || htmlElement.getAttribute('formControl') != null);
+}
+/**
+ * Finds form controls in the subtree of the element.
+ * @param element Html element to check along with its descendants.
+ * @param onlyActive Find only elements that are currently used as controls.
+ */
+function findFormControls(element, onlyActive = false) {
+    let controlSelector = onlyActive ? '[formControl]' : 'input, select, textarea, [formControl]';
+    return element.matches(controlSelector)
+        ? [element]
+        : element.hasAttribute('formControl-shadow-root')
+            ? [...element.shadowRoot.children].filter(child => !(child instanceof HTMLStyleElement)).flatMap(e => findFormControls(e, onlyActive))
+            : [...element.querySelectorAll(controlSelector),
+                ...[...element.querySelectorAll('[formControl-shadow-root]')].flatMap(shadowHost => findFormControls(shadowHost))];
+}
+/**
+ * Creates form controls from the provided elements.
+ * Radio and checkbox elements with the same name are grouped into a single form control.
+ *
+ * @param controls Html elements to combine into controls.
+ * @returns Array of combined controls or 'false' in cases when the provided elements all belong to a single control.
+ * This prevents infinite loop when this function is used by the overridden jQuery constructor.
+ */
+function combineControls(controls) {
+    let checkboxElements = getCheckboxElements(controls);
+    if (checkIfRadioControl(controls) || checkIfCheckboxControl(controls))
+        return false;
+    return controls
+        .filter(element => element.getAttribute('type') !== 'radio' && checkboxElements.includes(element) === false)
+        .map(element => $(element))
+        .concat(combineRadiosAndCheckboxes(controls).map(controlElements => $(controlElements)));
+}
+/**
+ * Returns true if the provided object has selected only the radio elements with the same name.
+ * @param jQueryObject
+ */
+function checkIfRadioControl(jQueryObject) {
+    let controls = Array.isArray(jQueryObject)
+        ? jQueryObject
+        : (jQueryObject[0] instanceof HTMLFormElement ? (jQueryObject).find('input') : jQueryObject).toArray().filter(htmlElement => isValidFormControl(htmlElement));
+    return controls.length === 0
+        ? false
+        : controls.every(element => element.getAttribute('type') === 'radio' && element.getAttribute('name') === controls[0].getAttribute('name'));
+}
+/**
+ * Returns true if one of the element is type 'checkbox' and other is type 'hidden'. And with the same name.
+ * @param jQueryObject
+ */
+function checkIfCheckboxControl(jQueryObject) {
+    let controls = Array.isArray(jQueryObject)
+        ? jQueryObject
+        : (jQueryObject[0] instanceof HTMLFormElement ? (jQueryObject).find('input') : jQueryObject).toArray().filter(htmlElement => isValidFormControl(htmlElement));
+    return controls.length === 1 && controls[0].getAttribute('type') === 'checkbox'
+        || controls.length === 2 && controls[0].getAttribute('name') === controls[1].getAttribute('name')
+            && controls.some(element => element.getAttribute('type') === 'checkbox') && controls.some(element => element.getAttribute('type') === 'hidden');
+}
+function getCheckboxElements(formControls) {
+    let checkboxElements = formControls.filter(e => e.getAttribute('type') === 'checkbox');
+    checkboxElements = [...checkboxElements,
+        ...formControls.filter(e => e.getAttribute('type') === 'hidden' && checkboxElements.some(c => c.getAttribute('name') === e.getAttribute('name')))];
+    return checkboxElements;
+}
+/**
+ * Find radio and checkbox inputs and combines those with the same name into an array.
+ * @param formControls Array of html elements of any type.
+ * @returns Array of those arrays of combined elements.
+ */
+function combineRadiosAndCheckboxes(formControls) {
+    let checkboxElements = getCheckboxElements(formControls);
+    let targetFields = [...checkboxElements, ...formControls.filter(element => element.getAttribute('type') === 'radio')];
+    let targetGroups = targetFields.reduce((acc, curr) => {
+        let name = curr.getAttribute('name');
+        acc[name] ? acc[name].push(curr) : (acc[name] = [curr]);
+        return acc;
+    }, {});
+    return Object.values(targetGroups);
+}
+/**
+ * If checked, returns input's value, otherwise returns hidden namesake's value.
+ */
+function getCheckboxValue(jQueryObject) {
+    var _a;
+    let controls = jQueryObject.toArray();
+    let checkboxInput = controls.find(c => c.getAttribute('type') === 'checkbox');
+    let hiddenInput = controls.find(c => c.getAttribute('type') === 'hidden');
+    return checkboxInput.checked ? checkboxInput.value : (_a = hiddenInput === null || hiddenInput === void 0 ? void 0 : hiddenInput.value) !== null && _a !== void 0 ? _a : '';
+}
+/**
+ * If any radio is checked returns its value, otherwise null;
+ */
+function getRadioValue(jQueryObject) {
+    var _a;
+    let controls = jQueryObject.toArray();
+    let checkedRadio = controls.find(c => c.checked);
+    return (_a = checkedRadio === null || checkedRadio === void 0 ? void 0 : checkedRadio.value) !== null && _a !== void 0 ? _a : '';
+}
+/**
+ * Converts array of form data to json.
+ * @param nonIndexedArray Array of name-value pairs.
+ */
+function convertArrayToJson(nonIndexedArray) {
+    let indexed_array = {};
+    // Regex which captures index value
+    let arrayRx = /\[(\d+)]$/;
+    for (let n of nonIndexedArray) {
+        let name = n['name'];
+        if (name.endsWith(']'))
+            name += '.';
+        else if (name.includes('.') === false) {
+            indexed_array[name] = n['value'];
+            continue;
+        }
+        let property = name.split('.')[name.split('.').length - 1];
+        let parents = name.split('.').slice(0, name.split('.').length - 1);
+        // Handle MVC Index property
+        if (property === 'Index')
+            continue;
+        let nestedProperty = indexed_array;
+        let previousParentIndex = null; // <-- not null if previous parent was an array
+        for (let parent of parents) {
+            let parentIsArray = arrayRx.test(parent);
+            let arrayIndex = null;
+            if (parentIsArray) {
+                arrayIndex = +parent.match(arrayRx)[1];
+                parent = parent.replace(arrayRx, '');
+            }
+            // If null, create a new object or an array
+            if ((previousParentIndex === null ? nestedProperty[parent] : nestedProperty[previousParentIndex][parent]) == null) {
+                if (previousParentIndex === null)
+                    nestedProperty[parent] = parentIsArray ? [] : {};
+                else
+                    nestedProperty[previousParentIndex][parent] = parentIsArray ? [] : {};
+            }
+            nestedProperty = previousParentIndex === null ? nestedProperty[parent] : nestedProperty[previousParentIndex][parent];
+            previousParentIndex = parentIsArray ? arrayIndex : null;
+        }
+        if (previousParentIndex === null)
+            property ? nestedProperty[property] = n['value'] : nestedProperty = n['value'];
+        else {
+            if (nestedProperty[previousParentIndex] == null)
+                nestedProperty[previousParentIndex] = {};
+            property ? nestedProperty[previousParentIndex][property] = n['value'] : nestedProperty[previousParentIndex] = n['value'];
+        }
+    }
+    return removeEmptyArrayElements(indexed_array);
+}
+/**
+ * Removes null / empty elements from the object elements.
+ * Useful when creating json representation of the form, since its arrays' elements might not be in sequence.
+ */
+function removeEmptyArrayElements(object) {
+    if (object instanceof Object) {
+        for (let entry of Object.entries(object)) {
+            let key = entry[0];
+            let value = entry[1];
+            if (value instanceof Array)
+                object[key] = value.filter(e => e != null).map(e => removeEmptyArrayElements(e));
+            else if (value instanceof Object)
+                object[key] = removeEmptyArrayElements(value);
+        }
+    }
+    else if (object instanceof Array) {
+        object = object.filter(e => e != null).map(e => removeEmptyArrayElements(e));
+    }
+    return object;
+}
+/*========================== Enums ==========================*/
+const FormControlStatusEnum = {
+    VALID: 'VALID',
+    INVALID: 'INVALID',
+    PENDING: 'PENDING',
+    DISABLED: 'DISABLED'
+};
+/*========================== Others ==========================*/
+function isNullOrWhitespace(searchTerm) {
+    return searchTerm == null || (/\S/.test(searchTerm)) === false;
+}
+
+/**
+ * @suppress {checkTypes,constantProperty,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
+ */
+/**
+ * A regular expression that matches valid e-mail addresses.
+ *
+ * At a high level, this regexp matches e-mail addresses of the format `local-part\@tld`, where:
+ * - `local-part` consists of one or more of the allowed characters (alphanumeric and some
+ *   punctuation symbols).
+ * - `local-part` cannot begin or end with a period (`.`).
+ * - `local-part` cannot be longer than 64 characters.
+ * - `tld` consists of one or more `labels` separated by periods (`.`). For example `localhost` or
+ *   `foo.com`.
+ * - A `label` consists of one or more of the allowed characters (alphanumeric, dashes (`-`) and
+ *   periods (`.`)).
+ * - A `label` cannot begin or end with a dash (`-`) or a period (`.`).
+ * - A `label` cannot be longer than 63 characters.
+ * - The whole address cannot be longer than 254 characters.
+ *
+ * ## Implementation background
+ *
+ * This regexp was ported over from AngularJS (see there for git history):
+ * https://github.com/angular/angular.js/blob/c133ef836/src/ng/directive/input.js#L27
+ * It is based on the
+ * [WHATWG version](https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address) with
+ * some enhancements to incorporate more RFC rules (such as rules related to domain names and the
+ * lengths of different parts of the address). The main differences from the WHATWG version are:
+ *   - Disallow `local-part` to begin or end with a period (`.`).
+ *   - Disallow `local-part` length to exceed 64 characters.
+ *   - Disallow total address length to exceed 254 characters.
+ *
+ * See [this commit](https://github.com/angular/angular.js/commit/f3f5cf72e) for more details.
+ * @type {?}
+ */
+const EMAIL_REGEXP = /^(?=.{1,254}$)(?=.{1,64}@)[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+/**
+ * \@description
+ * Provides a set of built-in validators that can be used by form controls.
+ *
+ * A validator is a function that processes a `FormControl` or collection of
+ * controls and returns an error map or null. A null map means that validation has passed.
+ *
+ * @see [Form Validation](/guide/form-validation)
+ *
+ * \@publicApi
+ */
+class Validators {
+    /**
+     * \@description
+     * Validator that requires the control's value to be greater than or equal to the provided number.
+     * The validator exists only as a function and not as a directive.
+     *
+     * \@usageNotes
+     *
+     * ### Validate against a minimum of 3
+     *
+     * ```typescript
+     * const control = new FormControl(2, Validators.min(3));
+     *
+     * console.log(control.errors); // {min: {min: 3, actual: 2}}
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} min
+     * @return {?} A validator function that returns an error map with the
+     * `min` property if the validation check fails, otherwise `null`.
+     *
+     */
+    static min(min) {
+        return ( /**
+         * @param {?} $control
+         * @return {?}
+         */($control) => {
+            if (isNullOrWhitespace($control.val()) || isNullOrWhitespace(min)) {
+                return null; // don't validate empty values to allow optional controls
+            }
+            /** @type {?} */
+            const value = parseFloat($control.val());
+            // Controls with NaN values after parsing should be treated as not having a
+            // minimum, per the HTML forms spec: https://www.w3.org/TR/html5/forms.html#attr-input-min
+            return !isNaN(value) && value < min ? { 'min': { 'min': min, 'actual': $control.val() } } : null;
+        });
+    }
+    /**
+     * \@description
+     * Validator that requires the control's value to be less than or equal to the provided number.
+     * The validator exists only as a function and not as a directive.
+     *
+     * \@usageNotes
+     *
+     * ### Validate against a maximum of 15
+     *
+     * ```typescript
+     * const control = new FormControl(16, Validators.max(15));
+     *
+     * console.log(control.errors); // {max: {max: 15, actual: 16}}
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} max
+     * @return {?} A validator function that returns an error map with the
+     * `max` property if the validation check fails, otherwise `null`.
+     *
+     */
+    static max(max) {
+        return ( /**
+         * @param {?} $control
+         * @return {?}
+         */($control) => {
+            if (isNullOrWhitespace($control.val()) || isNullOrWhitespace(max)) {
+                return null; // don't validate empty values to allow optional controls
+            }
+            /** @type {?} */
+            const value = parseFloat($control.val());
+            // Controls with NaN values after parsing should be treated as not having a
+            // maximum, per the HTML forms spec: https://www.w3.org/TR/html5/forms.html#attr-input-max
+            return !isNaN(value) && value > max ? { 'max': { 'max': max, 'actual': $control.val() } } : null;
+        });
+    }
+    /**
+     * \@description
+     * Validator that requires the control have a non-empty value.
+     *
+     * \@usageNotes
+     *
+     * ### Validate that the field is non-empty
+     *
+     * ```typescript
+     * const control = new FormControl('', Validators.required);
+     *
+     * console.log(control.errors); // {required: true}
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} $control
+     * @return {?} An error map with the `required` property
+     * if the validation check fails, otherwise `null`.
+     *
+     */
+    static required($control) {
+        let isRadioControl = checkIfRadioControl($control);
+        let isCheckboxControl = checkIfCheckboxControl($control);
+        let hasValue = true;
+        if (isRadioControl && $control.toArray().every(element => !element.checked))
+            hasValue = false;
+        else if (isCheckboxControl && $control.filter('[type=checkbox]').is(':checked') === false)
+            hasValue = false;
+        else if (!isRadioControl && !isCheckboxControl && isNullOrWhitespace($control.value))
+            hasValue = false;
+        return hasValue ? null : { 'required': true };
+    }
+    /**
+     * \@description
+     * Validator that requires the control's value be true. This validator is commonly
+     * used for required checkboxes.
+     *
+     * \@usageNotes
+     *
+     * ### Validate that the field value is true
+     *
+     * ```typescript
+     * const control = new FormControl('', Validators.requiredTrue);
+     *
+     * console.log(control.errors); // {required: true}
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} $control
+     * @return {?} An error map that contains the `required` property
+     * set to `true` if the validation check fails, otherwise `null`.
+     *
+     */
+    static requiredTrue($control) {
+        return $control.val().toLowerCase() === 'true' ? null : { 'required': true };
+    }
+    /**
+     * \@description
+     * Validator that requires the control's value pass an email validation test.
+     *
+     * Tests the value using a [regular expression](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions)
+     * pattern suitable for common usecases. The pattern is based on the definition of a valid email
+     * address in the [WHATWG HTML specification](https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address)
+     * with some enhancements to incorporate more RFC rules (such as rules related to domain names and
+     * the lengths of different parts of the address).
+     *
+     * The differences from the WHATWG version include:
+     * - Disallow `local-part` (the part before the `\@` symbol) to begin or end with a period (`.`).
+     * - Disallow `local-part` to be longer than 64 characters.
+     * - Disallow the whole address to be longer than 254 characters.
+     *
+     * If this pattern does not satisfy your business needs, you can use `Validators.pattern()` to
+     * validate the value against a different pattern.
+     *
+     * \@usageNotes
+     *
+     * ### Validate that the field matches a valid email pattern
+     *
+     * ```typescript
+     * const control = new FormControl('bad\@', Validators.email);
+     *
+     * console.log(control.errors); // {email: true}
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} $control
+     * @return {?} An error map with the `email` property
+     * if the validation check fails, otherwise `null`.
+     *
+     */
+    static email($control) {
+        if (isNullOrWhitespace($control.val())) {
+            return null; // don't validate empty values to allow optional controls
+        }
+        return EMAIL_REGEXP.test($control.val()) ? null : { 'email': true };
+    }
+    /**
+     * \@description
+     * Validator that requires the length of the control's value to be greater than or equal
+     * to the provided minimum length. This validator is also provided by default if you use the
+     * the HTML5 `minlength` attribute.
+     *
+     * \@usageNotes
+     *
+     * ### Validate that the field has a minimum of 3 characters
+     *
+     * ```typescript
+     * const control = new FormControl('ng', Validators.minLength(3));
+     *
+     * console.log(control.errors); // {minlength: {requiredLength: 3, actualLength: 2}}
+     * ```
+     *
+     * ```html
+     * <input minlength="5">
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} minLength
+     * @return {?} A validator function that returns an error map with the
+     * `minlength` if the validation check fails, otherwise `null`.
+     *
+     */
+    static minLength(minLength) {
+        return ( /**
+         * @param {?} $control
+         * @return {?}
+         */($control) => {
+            if (isNullOrWhitespace($control.val())) {
+                return null; // don't validate empty values to allow optional controls
+            }
+            /** @type {?} */
+            const length = $control.val() ? $control.val().length : 0;
+            return length < minLength ?
+                { 'minlength': { 'requiredLength': minLength, 'actualLength': length } } :
+                null;
+        });
+    }
+    /**
+     * \@description
+     * Validator that requires the length of the control's value to be less than or equal
+     * to the provided maximum length. This validator is also provided by default if you use the
+     * the HTML5 `maxlength` attribute.
+     *
+     * \@usageNotes
+     *
+     * ### Validate that the field has maximum of 5 characters
+     *
+     * ```typescript
+     * const control = new FormControl('Angular', Validators.maxLength(5));
+     *
+     * console.log(control.errors); // {maxlength: {requiredLength: 5, actualLength: 7}}
+     * ```
+     *
+     * ```html
+     * <input maxlength="5">
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} maxLength
+     * @return {?} A validator function that returns an error map with the
+     * `maxlength` property if the validation check fails, otherwise `null`.
+     *
+     */
+    static maxLength(maxLength) {
+        return ( /**
+         * @param {?} $control
+         * @return {?}
+         */($control) => {
+            /** @type {?} */
+            const length = $control.val() ? $control.val().length : 0;
+            return length > maxLength ?
+                { 'maxlength': { 'requiredLength': maxLength, 'actualLength': length } } :
+                null;
+        });
+    }
+    /**
+     * \@description
+     * Validator that requires the control's value to match a regex pattern. This validator is also
+     * provided by default if you use the HTML5 `pattern` attribute.
+     *
+     * \@usageNotes
+     *
+     * ### Validate that the field only contains letters or spaces
+     *
+     * ```typescript
+     * const control = new FormControl('1', Validators.pattern('[a-zA-Z ]*'));
+     *
+     * console.log(control.errors); // {pattern: {requiredPattern: '^[a-zA-Z ]*$', actualValue: '1'}}
+     * ```
+     *
+     * ```html
+     * <input pattern="[a-zA-Z ]*">
+     * ```
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} pattern A regular expression to be used as is to test the values, or a string.
+     * If a string is passed, the `^` character is prepended and the `$` character is
+     * appended to the provided string (if not already present), and the resulting regular
+     * expression is used to test the values.
+     *
+     * @return {?} A validator function that returns an error map with the
+     * `pattern` property if the validation check fails, otherwise `null`.
+     *
+     */
+    static pattern(pattern) {
+        if (!pattern)
+            return Validators.nullValidator;
+        /** @type {?} */
+        let regex;
+        /** @type {?} */
+        let regexStr;
+        if (typeof pattern === 'string') {
+            regexStr = '';
+            if (pattern.charAt(0) !== '^')
+                regexStr += '^';
+            regexStr += pattern;
+            if (pattern.charAt(pattern.length - 1) !== '$')
+                regexStr += '$';
+            regex = new RegExp(regexStr);
+        }
+        else {
+            regexStr = pattern.toString();
+            regex = pattern;
+        }
+        return ( /**
+         * @param {?} $control
+         * @return {?}
+         */($control) => {
+            if (isNullOrWhitespace($control.val())) {
+                return null; // don't validate empty values to allow optional controls
+            }
+            /** @type {?} */
+            const value = $control.val();
+            return regex.test(value) ? null :
+                { 'pattern': { 'requiredPattern': regexStr, 'actualValue': value } };
+        });
+    }
+    /**
+     * \@description
+     * Validator that performs no operation.
+     *
+     * @see `updateValueAndValidity()`
+     *
+     * @param {?} control
+     * @return {?}
+     */
+    static nullValidator(control) { return null; }
+    /**
+     * @param {?} validators
+     * @return {?}
+     */
+    static compose(validators) {
+        if (!validators)
+            return null;
+        /** @type {?} */
+        const presentValidators = ( /** @type {?} */(validators.filter(isPresent)));
+        if (presentValidators.length == 0)
+            return null;
+        return ( /**
+         * @param {?} control
+         * @return {?}
+         */function (control) {
+            return _mergeErrors(_executeValidators(control, presentValidators));
+        });
+    }
+}
+/**
+ * @param {?} o
+ * @return {?}
+ */
+function isPresent(o) {
+    return o != null;
+}
+/**
+ * @param {?} control
+ * @param {?} validators
+ * @return {?}
+ */
+function _executeValidators(control, validators) {
+    return validators.map(( /**
+     * @param {?} v
+     * @return {?}
+     *//**
+     * @param {?} v
+     * @return {?}
+     */ v => v(control)));
+}
+/**
+ * @param {?} arrayOfErrors
+ * @return {?}
+ */
+function _mergeErrors(arrayOfErrors) {
+    /** @type {?} */
+    const res = arrayOfErrors.reduce(( /**
+     * @param {?} res
+     * @param {?} errors
+     * @return {?}
+     */(res, errors) => {
+        return errors != null ? Object.assign({}, ( /** @type {?} */(res)), errors) : ( /** @type {?} */(res));
+    }), {});
+    return Object.keys(res).length === 0 ? null : res;
+}
+
+/**
+ * Used for global configuration.
+ */
+class ConfigService {
+    /**
+     * Registers validator functions to use on an control that has the specified attribute. You could use this function multiple times, but it won't have an effect on existing form controls.
+     * @param attributeValidators Object that has desired attribute names as keys, whose value are validator functions.
+     */
+    static registerAttributeValidators(attributeValidators) {
+        this.registeredAttributeValidators = Object.assign(Object.assign({}, this.registeredAttributeValidators), attributeValidators);
+    }
+}
+/**
+ * Observe changes in DOM, adding and removing of nodes,
+ * to update lists of controls in initialized groups.
+ *
+ * Example: adding an input element in a subtree of a form group will add it to the group.
+ */
+ConfigService.useMutationObservers = true;
+/**
+ * List of selectors that will make any new, or removed, html element that matches any of them be skipped over
+ * in Mutation observer's scan for changes in controls.
+ *
+ * This is a performance config and it is not required in 99% of cases.
+ */
+ConfigService.excludedObserverElements = ['span.popper.validation'];
+ConfigService.registeredAttributeValidators = {};
+/**
+ * Maps error codes to validation messages to display to user;
+ *
+ * Example:
+ * ```typescript
+ * validationErrors.required = 'The field is required';
+ * ```
+ */
+ConfigService.validationErrors = {};
+
 /*! *****************************************************************************
 Copyright (c) Microsoft Corporation.
 
@@ -4547,189 +5199,6 @@ function isEventTarget(sourceObj) {
     return sourceObj && typeof sourceObj.addEventListener === 'function' && typeof sourceObj.removeEventListener === 'function';
 }
 
-/*========================== Input functionality ==========================*/
-/**
- * Returns true if it's either HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, or has the `formControl` attribute.
- */
-function isValidFormControl(htmlElement) {
-    return (htmlElement instanceof HTMLElement) && (htmlElement instanceof HTMLInputElement || htmlElement instanceof HTMLSelectElement || htmlElement instanceof HTMLTextAreaElement
-        || htmlElement.getAttribute('formControl') != null);
-}
-/**
- * Finds form controls in the subtree of the element.
- * @param element Html element to check along with its descendants.
- * @param onlyActive Find only elements that are currently used as controls.
- */
-function findFormControls(element, onlyActive = false) {
-    let controlSelector = onlyActive ? '[formControl]' : 'input, select, textarea, [formControl]';
-    return element.matches(controlSelector)
-        ? [element]
-        : element.hasAttribute('formControl-shadow-root')
-            ? [...element.shadowRoot.children].filter(child => !(child instanceof HTMLStyleElement)).flatMap(e => findFormControls(e, onlyActive))
-            : [...element.querySelectorAll(controlSelector),
-                ...[...element.querySelectorAll('[formControl-shadow-root]')].flatMap(shadowHost => findFormControls(shadowHost))];
-}
-/**
- * Creates form controls from the provided elements.
- * Radio and checkbox elements with the same name are grouped into a single form control.
- *
- * @param controls Html elements to combine into controls.
- * @returns Array of combined controls or 'false' in cases when the provided elements all belong to a single control.
- * This prevents infinite loop when this function is used by the overridden jQuery constructor.
- */
-function combineControls(controls) {
-    let checkboxElements = getCheckboxElements(controls);
-    if (checkIfRadioControl(controls) || checkIfCheckboxControl(controls))
-        return false;
-    return controls
-        .filter(element => element.getAttribute('type') !== 'radio' && checkboxElements.includes(element) === false)
-        .map(element => $(element))
-        .concat(combineRadiosAndCheckboxes(controls).map(controlElements => $(controlElements)));
-}
-/**
- * Returns true if the provided object has selected only the radio elements with the same name.
- * @param jQueryObject
- */
-function checkIfRadioControl(jQueryObject) {
-    let controls = Array.isArray(jQueryObject)
-        ? jQueryObject
-        : (jQueryObject[0] instanceof HTMLFormElement ? (jQueryObject).find('input') : jQueryObject).toArray().filter(htmlElement => isValidFormControl(htmlElement));
-    return controls.length === 0
-        ? false
-        : controls.every(element => element.getAttribute('type') === 'radio' && element.getAttribute('name') === controls[0].getAttribute('name'));
-}
-/**
- * Returns true if one of the element is type 'checkbox' and other is type 'hidden'. And with the same name.
- * @param jQueryObject
- */
-function checkIfCheckboxControl(jQueryObject) {
-    let controls = Array.isArray(jQueryObject)
-        ? jQueryObject
-        : (jQueryObject[0] instanceof HTMLFormElement ? (jQueryObject).find('input') : jQueryObject).toArray().filter(htmlElement => isValidFormControl(htmlElement));
-    return controls.length === 1 && controls[0].getAttribute('type') === 'checkbox'
-        || controls.length === 2 && controls[0].getAttribute('name') === controls[1].getAttribute('name')
-            && controls.some(element => element.getAttribute('type') === 'checkbox') && controls.some(element => element.getAttribute('type') === 'hidden');
-}
-function getCheckboxElements(formControls) {
-    let checkboxElements = formControls.filter(e => e.getAttribute('type') === 'checkbox');
-    checkboxElements = [...checkboxElements,
-        ...formControls.filter(e => e.getAttribute('type') === 'hidden' && checkboxElements.some(c => c.getAttribute('name') === e.getAttribute('name')))];
-    return checkboxElements;
-}
-/**
- * Find radio and checkbox inputs and combines those with the same name into an array.
- * @param formControls Array of html elements of any type.
- * @returns Array of those arrays of combined elements.
- */
-function combineRadiosAndCheckboxes(formControls) {
-    let checkboxElements = getCheckboxElements(formControls);
-    let targetFields = [...checkboxElements, ...formControls.filter(element => element.getAttribute('type') === 'radio')];
-    let targetGroups = targetFields.reduce((acc, curr) => {
-        let name = curr.getAttribute('name');
-        acc[name] ? acc[name].push(curr) : (acc[name] = [curr]);
-        return acc;
-    }, {});
-    return Object.values(targetGroups);
-}
-/**
- * If checked, returns input's value, otherwise returns hidden namesake's value.
- */
-function getCheckboxValue(jQueryObject) {
-    var _a;
-    let controls = jQueryObject.toArray();
-    let checkboxInput = controls.find(c => c.getAttribute('type') === 'checkbox');
-    let hiddenInput = controls.find(c => c.getAttribute('type') === 'hidden');
-    return checkboxInput.checked ? checkboxInput.value : (_a = hiddenInput === null || hiddenInput === void 0 ? void 0 : hiddenInput.value) !== null && _a !== void 0 ? _a : '';
-}
-/**
- * If any radio is checked returns its value, otherwise null;
- */
-function getRadioValue(jQueryObject) {
-    var _a;
-    let controls = jQueryObject.toArray();
-    let checkedRadio = controls.find(c => c.checked);
-    return (_a = checkedRadio === null || checkedRadio === void 0 ? void 0 : checkedRadio.value) !== null && _a !== void 0 ? _a : '';
-}
-/**
- * Converts array of form data to json.
- * @param nonIndexedArray Array of name-value pairs.
- */
-function convertArrayToJson(nonIndexedArray) {
-    let indexed_array = {};
-    // Regex which captures index value
-    let arrayRx = /\[(\d+)\]$/;
-    for (let n of nonIndexedArray) {
-        let name = n['name'];
-        if (name.includes('.') === false) {
-            indexed_array[name] = n['value'];
-            continue;
-        }
-        let property = name.split('.')[name.split('.').length - 1];
-        let parents = name.split('.').slice(0, name.split('.').length - 1);
-        // Handle MVC Index property
-        if (property === 'Index')
-            continue;
-        let nestedProperty = indexed_array;
-        let previousParentIndex = null; // <-- not null if previous parent was an array
-        for (let parent of parents) {
-            let parentIsArray = arrayRx.test(parent);
-            let arrayIndex = null;
-            if (parentIsArray) {
-                arrayIndex = +parent.match(arrayRx)[1];
-                parent = parent.replace(arrayRx, '');
-            }
-            // If null, create a new object or an array
-            if ((previousParentIndex === null ? nestedProperty[parent] : nestedProperty[previousParentIndex][parent]) == null) {
-                if (previousParentIndex === null)
-                    nestedProperty[parent] = parentIsArray ? [] : {};
-                else
-                    nestedProperty[previousParentIndex][parent] = parentIsArray ? [] : {};
-            }
-            nestedProperty = previousParentIndex === null ? nestedProperty[parent] : nestedProperty[previousParentIndex][parent];
-            previousParentIndex = parentIsArray ? arrayIndex : null;
-        }
-        if (previousParentIndex === null)
-            nestedProperty[property] = n['value'];
-        else {
-            if (nestedProperty[previousParentIndex] == null)
-                nestedProperty[previousParentIndex] = {};
-            nestedProperty[previousParentIndex][property] = n['value'];
-        }
-    }
-    return removeEmptyArrayElements(indexed_array);
-}
-/**
- * Removes null / empty elements from the object elements.
- * Useful when creating json representation of the form, since its arrays' elements might not be in sequence.
- */
-function removeEmptyArrayElements(object) {
-    if (object instanceof Object) {
-        for (let entry of Object.entries(object)) {
-            let key = entry[0];
-            let value = entry[1];
-            if (value instanceof Array)
-                object[key] = value.filter(e => e != null).map(e => removeEmptyArrayElements(e));
-            else if (value instanceof Object)
-                object[key] = removeEmptyArrayElements(value);
-        }
-    }
-    else if (object instanceof Array) {
-        object = object.filter(e => e != null).map(e => removeEmptyArrayElements(e));
-    }
-    return object;
-}
-/*========================== Enums ==========================*/
-const FormControlStatusEnum = {
-    VALID: 'VALID',
-    INVALID: 'INVALID',
-    PENDING: 'PENDING',
-    DISABLED: 'DISABLED'
-};
-/*========================== Others ==========================*/
-function isNullOrWhitespace(searchTerm) {
-    return searchTerm == null || (/\S/.test(searchTerm)) === false;
-}
-
 /**
  * Creates an Observable that emits information whether the provided target element
  * occupies space in DOM, to its full extent.
@@ -4920,16 +5389,17 @@ function addFormControlProperties(jQueryObject, valueChangesUI = null, touchedUI
         // Note 1: startWith() sets the value when the controls array changes
         // Note 2: delay makes sure value change of an individual control would trigger its subscription handlers before group one's would. (RxJS is synchronous by default)
         ));
-    valueChangesUI.subscribe(value => jQueryObject.valueChangesSubject.next(value));
+    let s1 = valueChangesUI.subscribe(value => jQueryObject.valueChangesSubject.next(value));
     // Touched state
     jQueryObject.touchedSubject = new Subject();
+    jQueryObject.subscriptions = new Subscription();
     jQueryObject.markAsUntouched();
     touchedUI$ = touchedUI$
         ? touchedUI$
         : jQueryObject.controls$.pipe(switchMap(_ => jQueryObject.isFormControl
             ? fromEvent(jQueryObject, 'focus')
             : merge(...jQueryObject.controls.map($formControl => $formControl.touchedSubject.asObservable())).pipe(filter(isTouched => isTouched), delay(1))));
-    touchedUI$.subscribe(_ => jQueryObject.markAsTouched());
+    let s2 = touchedUI$.subscribe(_ => jQueryObject.markAsTouched());
     // Dirty state
     jQueryObject.dirtySubject = new Subject();
     jQueryObject.markAsPristine();
@@ -4938,9 +5408,10 @@ function addFormControlProperties(jQueryObject, valueChangesUI = null, touchedUI
         : jQueryObject.controls$.pipe(switchMap(_ => jQueryObject.isFormControl
             ? jQueryObject.valueChanges
             : merge(...jQueryObject.controls.map($formControl => $formControl.dirtySubject.asObservable())).pipe(filter(isDirty => isDirty), delay(1))));
-    dirtyUI$.subscribe(_ => jQueryObject.markAsDirty());
+    let s3 = dirtyUI$.subscribe(_ => jQueryObject.markAsDirty());
     // Disabled subject
     jQueryObject.disabledSubject = new Subject();
+    jQueryObject.subscriptions.add(s1).add(s2).add(s3);
 }
 /*========================== Private Part ==========================*/
 function getFormControlValue($formControl) {
@@ -5059,10 +5530,13 @@ function destroyControl(jQueryObject) {
     jQueryObject.touchedSubject.complete();
     jQueryObject.dirtySubject.complete();
     jQueryObject.controlsSubject.complete();
+    jQueryObject.disabledSubject.complete();
+    jQueryObject.subscriptions.unsubscribe();
     // Delete added properties
     delete jQueryObject.valueChangesSubject;
     delete jQueryObject.touchedSubject;
     delete jQueryObject.dirtySubject;
+    delete jQueryObject.disabledSubject;
     delete jQueryObject.controlsSubject;
     delete jQueryObject.valueChanges;
     delete jQueryObject.controls$;
@@ -5151,14 +5625,6 @@ function disableValidation(jQueryObject) {
     delete jQueryObject.isValidationEnabled;
     return jQueryObject;
 }
-let registeredAttributeValidators = {};
-/**
- * Registers validator functions to use on an control that has the specified attribute. You could use this function multiple times, but it won't have an effect on existing form controls.
- * @param attributeValidators Object that has desired attribute names as keys, whose value are validator functions.
- */
-function registerAttributeValidators(attributeValidators) {
-    registeredAttributeValidators = Object.assign(Object.assign({}, registeredAttributeValidators), attributeValidators);
-}
 /**
  * Attaches validity popper, which will be displayed when control is dirty and invalid, auto-flip when needed, auto-update whenever reference changes visibility.
  * @param jQueryObject Form control / group the popper attaches to.
@@ -5219,7 +5685,7 @@ function attachPopper(jQueryObject) {
         // Show if dirty and invalid (with personal errors) or hide otherwise
         if (jQueryObject.dirty && jQueryObject.invalid && jQueryObject.errors) {
             // Form groups, by default, show their errors once all of their descendants become dirty
-            if (jQueryObject.controls.length > 1 && jQueryObject.controls.some(formControl => formControl.pristine))
+            if (jQueryObject.controls.length > 1 && jQueryObject.controls.some(formControl => formControl.pristine) && wasValidityMessageShown === false)
                 return;
             let errorMessage = Object.keys(jQueryObject.errors).map(key => typeof jQueryObject.errors[key] === 'string' ? jQueryObject.errors[key] : validationErrors[key]).join('\n');
             $popper.find('.field-validation').addClass('field-validation-error').html(errorMessage);
@@ -5250,9 +5716,9 @@ function hasError(jQueryObject, errorCode) {
  */
 function setValidationRulesFromAttributes($formControl) {
     let validators = [];
-    for (let attribute in registeredAttributeValidators)
+    for (let attribute in ConfigService.registeredAttributeValidators)
         if ($formControl.attr(attribute) !== undefined)
-            validators = validators.concat(Array.isArray(registeredAttributeValidators[attribute]) ? registeredAttributeValidators[attribute] : [registeredAttributeValidators[attribute]]);
+            validators = validators.concat(Array.isArray(ConfigService.registeredAttributeValidators[attribute]) ? ConfigService.registeredAttributeValidators[attribute] : [ConfigService.registeredAttributeValidators[attribute]]);
     if (validators.length > 0)
         $formControl.setValidators(validators);
 }
@@ -5336,6 +5802,8 @@ function determinePopperPositioning(jQueryObject) {
         else
             $reference = getCommonAncestor(...references);
     }
+    // Handle empty controls
+    $reference = $reference !== null && $reference !== void 0 ? $reference : $();
     return { $reference, placement: determinePlacement(jQueryObject, $reference[0]) };
 }
 /**
@@ -5349,6 +5817,8 @@ function getCommonAncestor(...objects) {
     return $(commonAncestor);
 }
 function getParents($element) {
+    if ($element[0] == null)
+        return [];
     let isInsideShadowRoot = $element[0].getRootNode() instanceof ShadowRoot;
     let parents = $element.parents().toArray();
     if (isInsideShadowRoot) {
@@ -5376,7 +5846,7 @@ function updatePopperPlacement(jQueryObject) {
  * @param $oldControl
  */
 function migrateValidationToNewGroup($newGroup, $oldControl) {
-    let attributeValidators = Object.values(registeredAttributeValidators).flatMap(e => e);
+    let attributeValidators = Object.values(ConfigService.registeredAttributeValidators).flatMap(e => e);
     let validatorsFromAttributes = $newGroup.getValidators().filter(valFn => attributeValidators.includes(valFn));
     let otherValidators = $newGroup.getValidators().filter(valFn => attributeValidators.includes(valFn) === false);
     $newGroup.setValidators(otherValidators);
@@ -5385,456 +5855,6 @@ function migrateValidationToNewGroup($newGroup, $oldControl) {
     $oldControl.updateValidity();
 }
 registerInputToGroupTransformation(migrateValidationToNewGroup);
-
-/**
- * @suppress {checkTypes,constantProperty,extraRequire,missingOverride,missingReturn,unusedPrivateMembers,uselessCode} checked by tsc
- */
-/**
- * A regular expression that matches valid e-mail addresses.
- *
- * At a high level, this regexp matches e-mail addresses of the format `local-part\@tld`, where:
- * - `local-part` consists of one or more of the allowed characters (alphanumeric and some
- *   punctuation symbols).
- * - `local-part` cannot begin or end with a period (`.`).
- * - `local-part` cannot be longer than 64 characters.
- * - `tld` consists of one or more `labels` separated by periods (`.`). For example `localhost` or
- *   `foo.com`.
- * - A `label` consists of one or more of the allowed characters (alphanumeric, dashes (`-`) and
- *   periods (`.`)).
- * - A `label` cannot begin or end with a dash (`-`) or a period (`.`).
- * - A `label` cannot be longer than 63 characters.
- * - The whole address cannot be longer than 254 characters.
- *
- * ## Implementation background
- *
- * This regexp was ported over from AngularJS (see there for git history):
- * https://github.com/angular/angular.js/blob/c133ef836/src/ng/directive/input.js#L27
- * It is based on the
- * [WHATWG version](https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address) with
- * some enhancements to incorporate more RFC rules (such as rules related to domain names and the
- * lengths of different parts of the address). The main differences from the WHATWG version are:
- *   - Disallow `local-part` to begin or end with a period (`.`).
- *   - Disallow `local-part` length to exceed 64 characters.
- *   - Disallow total address length to exceed 254 characters.
- *
- * See [this commit](https://github.com/angular/angular.js/commit/f3f5cf72e) for more details.
- * @type {?}
- */
-const EMAIL_REGEXP = /^(?=.{1,254}$)(?=.{1,64}@)[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-/**
- * \@description
- * Provides a set of built-in validators that can be used by form controls.
- *
- * A validator is a function that processes a `FormControl` or collection of
- * controls and returns an error map or null. A null map means that validation has passed.
- *
- * @see [Form Validation](/guide/form-validation)
- *
- * \@publicApi
- */
-class Validators {
-    /**
-     * \@description
-     * Validator that requires the control's value to be greater than or equal to the provided number.
-     * The validator exists only as a function and not as a directive.
-     *
-     * \@usageNotes
-     *
-     * ### Validate against a minimum of 3
-     *
-     * ```typescript
-     * const control = new FormControl(2, Validators.min(3));
-     *
-     * console.log(control.errors); // {min: {min: 3, actual: 2}}
-     * ```
-     *
-     * @see `updateValueAndValidity()`
-     *
-     * @param {?} min
-     * @return {?} A validator function that returns an error map with the
-     * `min` property if the validation check fails, otherwise `null`.
-     *
-     */
-    static min(min) {
-        return ( /**
-         * @param {?} $control
-         * @return {?}
-         */($control) => {
-            if (isNullOrWhitespace($control.val()) || isNullOrWhitespace(min)) {
-                return null; // don't validate empty values to allow optional controls
-            }
-            /** @type {?} */
-            const value = parseFloat($control.val());
-            // Controls with NaN values after parsing should be treated as not having a
-            // minimum, per the HTML forms spec: https://www.w3.org/TR/html5/forms.html#attr-input-min
-            return !isNaN(value) && value < min ? { 'min': { 'min': min, 'actual': $control.val() } } : null;
-        });
-    }
-    /**
-     * \@description
-     * Validator that requires the control's value to be less than or equal to the provided number.
-     * The validator exists only as a function and not as a directive.
-     *
-     * \@usageNotes
-     *
-     * ### Validate against a maximum of 15
-     *
-     * ```typescript
-     * const control = new FormControl(16, Validators.max(15));
-     *
-     * console.log(control.errors); // {max: {max: 15, actual: 16}}
-     * ```
-     *
-     * @see `updateValueAndValidity()`
-     *
-     * @param {?} max
-     * @return {?} A validator function that returns an error map with the
-     * `max` property if the validation check fails, otherwise `null`.
-     *
-     */
-    static max(max) {
-        return ( /**
-         * @param {?} $control
-         * @return {?}
-         */($control) => {
-            if (isNullOrWhitespace($control.val()) || isNullOrWhitespace(max)) {
-                return null; // don't validate empty values to allow optional controls
-            }
-            /** @type {?} */
-            const value = parseFloat($control.val());
-            // Controls with NaN values after parsing should be treated as not having a
-            // maximum, per the HTML forms spec: https://www.w3.org/TR/html5/forms.html#attr-input-max
-            return !isNaN(value) && value > max ? { 'max': { 'max': max, 'actual': $control.val() } } : null;
-        });
-    }
-    /**
-     * \@description
-     * Validator that requires the control have a non-empty value.
-     *
-     * \@usageNotes
-     *
-     * ### Validate that the field is non-empty
-     *
-     * ```typescript
-     * const control = new FormControl('', Validators.required);
-     *
-     * console.log(control.errors); // {required: true}
-     * ```
-     *
-     * @see `updateValueAndValidity()`
-     *
-     * @param {?} $control
-     * @return {?} An error map with the `required` property
-     * if the validation check fails, otherwise `null`.
-     *
-     */
-    static required($control) {
-        let isRadioControl = checkIfRadioControl($control);
-        let isCheckboxControl = checkIfCheckboxControl($control);
-        let hasValue = true;
-        if (isRadioControl && $control.toArray().every(element => !element.checked))
-            hasValue = false;
-        else if (isCheckboxControl && $control.filter('[type=checkbox]').is(':checked') === false)
-            hasValue = false;
-        else if (!isRadioControl && !isCheckboxControl && isNullOrWhitespace($control.value))
-            hasValue = false;
-        return hasValue ? null : { 'required': true };
-    }
-    /**
-     * \@description
-     * Validator that requires the control's value be true. This validator is commonly
-     * used for required checkboxes.
-     *
-     * \@usageNotes
-     *
-     * ### Validate that the field value is true
-     *
-     * ```typescript
-     * const control = new FormControl('', Validators.requiredTrue);
-     *
-     * console.log(control.errors); // {required: true}
-     * ```
-     *
-     * @see `updateValueAndValidity()`
-     *
-     * @param {?} $control
-     * @return {?} An error map that contains the `required` property
-     * set to `true` if the validation check fails, otherwise `null`.
-     *
-     */
-    static requiredTrue($control) {
-        return $control.val().toLowerCase() === 'true' ? null : { 'required': true };
-    }
-    /**
-     * \@description
-     * Validator that requires the control's value pass an email validation test.
-     *
-     * Tests the value using a [regular expression](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions)
-     * pattern suitable for common usecases. The pattern is based on the definition of a valid email
-     * address in the [WHATWG HTML specification](https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address)
-     * with some enhancements to incorporate more RFC rules (such as rules related to domain names and
-     * the lengths of different parts of the address).
-     *
-     * The differences from the WHATWG version include:
-     * - Disallow `local-part` (the part before the `\@` symbol) to begin or end with a period (`.`).
-     * - Disallow `local-part` to be longer than 64 characters.
-     * - Disallow the whole address to be longer than 254 characters.
-     *
-     * If this pattern does not satisfy your business needs, you can use `Validators.pattern()` to
-     * validate the value against a different pattern.
-     *
-     * \@usageNotes
-     *
-     * ### Validate that the field matches a valid email pattern
-     *
-     * ```typescript
-     * const control = new FormControl('bad\@', Validators.email);
-     *
-     * console.log(control.errors); // {email: true}
-     * ```
-     *
-     * @see `updateValueAndValidity()`
-     *
-     * @param {?} $control
-     * @return {?} An error map with the `email` property
-     * if the validation check fails, otherwise `null`.
-     *
-     */
-    static email($control) {
-        if (isNullOrWhitespace($control.val())) {
-            return null; // don't validate empty values to allow optional controls
-        }
-        return EMAIL_REGEXP.test($control.val()) ? null : { 'email': true };
-    }
-    /**
-     * \@description
-     * Validator that requires the length of the control's value to be greater than or equal
-     * to the provided minimum length. This validator is also provided by default if you use the
-     * the HTML5 `minlength` attribute.
-     *
-     * \@usageNotes
-     *
-     * ### Validate that the field has a minimum of 3 characters
-     *
-     * ```typescript
-     * const control = new FormControl('ng', Validators.minLength(3));
-     *
-     * console.log(control.errors); // {minlength: {requiredLength: 3, actualLength: 2}}
-     * ```
-     *
-     * ```html
-     * <input minlength="5">
-     * ```
-     *
-     * @see `updateValueAndValidity()`
-     *
-     * @param {?} minLength
-     * @return {?} A validator function that returns an error map with the
-     * `minlength` if the validation check fails, otherwise `null`.
-     *
-     */
-    static minLength(minLength) {
-        return ( /**
-         * @param {?} $control
-         * @return {?}
-         */($control) => {
-            if (isNullOrWhitespace($control.val())) {
-                return null; // don't validate empty values to allow optional controls
-            }
-            /** @type {?} */
-            const length = $control.val() ? $control.val().length : 0;
-            return length < minLength ?
-                { 'minlength': { 'requiredLength': minLength, 'actualLength': length } } :
-                null;
-        });
-    }
-    /**
-     * \@description
-     * Validator that requires the length of the control's value to be less than or equal
-     * to the provided maximum length. This validator is also provided by default if you use the
-     * the HTML5 `maxlength` attribute.
-     *
-     * \@usageNotes
-     *
-     * ### Validate that the field has maximum of 5 characters
-     *
-     * ```typescript
-     * const control = new FormControl('Angular', Validators.maxLength(5));
-     *
-     * console.log(control.errors); // {maxlength: {requiredLength: 5, actualLength: 7}}
-     * ```
-     *
-     * ```html
-     * <input maxlength="5">
-     * ```
-     *
-     * @see `updateValueAndValidity()`
-     *
-     * @param {?} maxLength
-     * @return {?} A validator function that returns an error map with the
-     * `maxlength` property if the validation check fails, otherwise `null`.
-     *
-     */
-    static maxLength(maxLength) {
-        return ( /**
-         * @param {?} $control
-         * @return {?}
-         */($control) => {
-            /** @type {?} */
-            const length = $control.val() ? $control.val().length : 0;
-            return length > maxLength ?
-                { 'maxlength': { 'requiredLength': maxLength, 'actualLength': length } } :
-                null;
-        });
-    }
-    /**
-     * \@description
-     * Validator that requires the control's value to match a regex pattern. This validator is also
-     * provided by default if you use the HTML5 `pattern` attribute.
-     *
-     * \@usageNotes
-     *
-     * ### Validate that the field only contains letters or spaces
-     *
-     * ```typescript
-     * const control = new FormControl('1', Validators.pattern('[a-zA-Z ]*'));
-     *
-     * console.log(control.errors); // {pattern: {requiredPattern: '^[a-zA-Z ]*$', actualValue: '1'}}
-     * ```
-     *
-     * ```html
-     * <input pattern="[a-zA-Z ]*">
-     * ```
-     *
-     * @see `updateValueAndValidity()`
-     *
-     * @param {?} pattern A regular expression to be used as is to test the values, or a string.
-     * If a string is passed, the `^` character is prepended and the `$` character is
-     * appended to the provided string (if not already present), and the resulting regular
-     * expression is used to test the values.
-     *
-     * @return {?} A validator function that returns an error map with the
-     * `pattern` property if the validation check fails, otherwise `null`.
-     *
-     */
-    static pattern(pattern) {
-        if (!pattern)
-            return Validators.nullValidator;
-        /** @type {?} */
-        let regex;
-        /** @type {?} */
-        let regexStr;
-        if (typeof pattern === 'string') {
-            regexStr = '';
-            if (pattern.charAt(0) !== '^')
-                regexStr += '^';
-            regexStr += pattern;
-            if (pattern.charAt(pattern.length - 1) !== '$')
-                regexStr += '$';
-            regex = new RegExp(regexStr);
-        }
-        else {
-            regexStr = pattern.toString();
-            regex = pattern;
-        }
-        return ( /**
-         * @param {?} $control
-         * @return {?}
-         */($control) => {
-            if (isNullOrWhitespace($control.val())) {
-                return null; // don't validate empty values to allow optional controls
-            }
-            /** @type {?} */
-            const value = $control.val();
-            return regex.test(value) ? null :
-                { 'pattern': { 'requiredPattern': regexStr, 'actualValue': value } };
-        });
-    }
-    /**
-     * \@description
-     * Validator that performs no operation.
-     *
-     * @see `updateValueAndValidity()`
-     *
-     * @param {?} control
-     * @return {?}
-     */
-    static nullValidator(control) { return null; }
-    /**
-     * @param {?} validators
-     * @return {?}
-     */
-    static compose(validators) {
-        if (!validators)
-            return null;
-        /** @type {?} */
-        const presentValidators = ( /** @type {?} */(validators.filter(isPresent)));
-        if (presentValidators.length == 0)
-            return null;
-        return ( /**
-         * @param {?} control
-         * @return {?}
-         */function (control) {
-            return _mergeErrors(_executeValidators(control, presentValidators));
-        });
-    }
-}
-/**
- * @param {?} o
- * @return {?}
- */
-function isPresent(o) {
-    return o != null;
-}
-/**
- * @param {?} control
- * @param {?} validators
- * @return {?}
- */
-function _executeValidators(control, validators) {
-    return validators.map(( /**
-     * @param {?} v
-     * @return {?}
-     *//**
-     * @param {?} v
-     * @return {?}
-     */ v => v(control)));
-}
-/**
- * @param {?} arrayOfErrors
- * @return {?}
- */
-function _mergeErrors(arrayOfErrors) {
-    /** @type {?} */
-    const res = arrayOfErrors.reduce(( /**
-     * @param {?} res
-     * @param {?} errors
-     * @return {?}
-     */(res, errors) => {
-        return errors != null ? Object.assign({}, ( /** @type {?} */(res)), errors) : ( /** @type {?} */(res));
-    }), {});
-    return Object.keys(res).length === 0 ? null : res;
-}
-
-/**
- * Used for global configuration.
- */
-class ConfigService {
-}
-/**
- * Observe changes in DOM, adding and removing of nodes,
- * to update lists of controls in initialized groups.
- *
- * Example: adding an input element in a subtree of a form group will add it to the group.
- */
-ConfigService.useMutationObservers = true;
-/**
- * List of selectors that will make any new, or removed, html element that matches any of them be skipped over
- * in Mutation observer's scan for changes in controls.
- *
- * This is a performance config and it is not required in 99% of cases.
- */
-ConfigService.excludedObserverElements = ['span.popper.validation'];
 
 function extendFormElements() {
     let baseAttrFn = jQuery.fn.attr;
@@ -6042,4 +6062,4 @@ function extendFormElements() {
 
 extendFormElements();
 
-export { ConfigService, FormControlStatusEnum as FormControlStatus, Validators, checkIfCheckboxControl, checkIfRadioControl, combineControls, combineRadiosAndCheckboxes, convertArrayToJson, findFormControls, fromFullVisibility, fromResize, getCheckboxElements, getCheckboxValue, getRadioValue, isNullOrWhitespace, isValidFormControl, registerAttributeValidators };
+export { ConfigService, FormControlStatusEnum as FormControlStatus, Validators, checkIfCheckboxControl, checkIfRadioControl, combineControls, combineRadiosAndCheckboxes, convertArrayToJson, findFormControls, fromFullVisibility, fromResize, getCheckboxElements, getCheckboxValue, getRadioValue, isNullOrWhitespace, isValidFormControl };

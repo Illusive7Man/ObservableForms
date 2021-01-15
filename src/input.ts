@@ -1,4 +1,4 @@
-﻿import {BehaviorSubject, fromEvent, merge, Observable, Subject} from "rxjs";
+﻿import {BehaviorSubject, fromEvent, merge, Observable, Subject, Subscription} from "rxjs";
 import {delay, distinctUntilChanged, filter, map, share, skip, startWith, switchMap, tap} from "rxjs/operators";
 import {
     checkIfCheckboxControl,
@@ -195,11 +195,13 @@ function addFormControlProperties(jQueryObject: JQuery<FormControlType | HTMLFor
             )
         );
 
+    let s1 =
     valueChangesUI.subscribe(value => jQueryObject.valueChangesSubject.next(value));
 
 
     // Touched state
     jQueryObject.touchedSubject = new Subject<boolean>();
+    jQueryObject.subscriptions = new Subscription();
     jQueryObject.markAsUntouched();
 
     touchedUI$ = touchedUI$
@@ -210,6 +212,7 @@ function addFormControlProperties(jQueryObject: JQuery<FormControlType | HTMLFor
                 : merge(...jQueryObject.controls.map($formControl => $formControl.touchedSubject.asObservable())).pipe(filter(isTouched => isTouched), delay(1))
             )) as any;
 
+    let s2 =
     touchedUI$.subscribe(_ => jQueryObject.markAsTouched());
 
 
@@ -225,12 +228,14 @@ function addFormControlProperties(jQueryObject: JQuery<FormControlType | HTMLFor
                 : merge(...jQueryObject.controls.map($formControl => $formControl.dirtySubject.asObservable())).pipe(filter(isDirty => isDirty), delay(1))
             )) as any;
 
+    let s3 =
     dirtyUI$.subscribe(_ => jQueryObject.markAsDirty());
 
 
     // Disabled subject
     jQueryObject.disabledSubject = new Subject<boolean>();
 
+    jQueryObject.subscriptions.add(s1).add(s2).add(s3);
 }
 
 
@@ -375,11 +380,14 @@ export function destroyControl(jQueryObject: JQuery<FormControlType | HTMLFormEl
     jQueryObject.touchedSubject.complete();
     jQueryObject.dirtySubject.complete();
     jQueryObject.controlsSubject.complete();
+    jQueryObject.disabledSubject.complete();
+    jQueryObject.subscriptions.unsubscribe();
 
     // Delete added properties
     delete jQueryObject.valueChangesSubject;
     delete jQueryObject.touchedSubject;
     delete jQueryObject.dirtySubject;
+    delete jQueryObject.disabledSubject;
     delete jQueryObject.controlsSubject;
 
     delete jQueryObject.valueChanges;

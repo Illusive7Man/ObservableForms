@@ -134,13 +134,15 @@ export function convertArrayToJson(nonIndexedArray: {name: string, value: any}[]
     let indexed_array = {};
 
     // Regex which captures index value
-    let arrayRx = /\[(\d+)\]$/;
+    let arrayRx = /\[(\d+)]$/;
 
     for (let n of nonIndexedArray) {
 
         let name = n['name'];
 
-        if (name.includes('.') === false) {
+        if (name.endsWith(']'))
+            name += '.';
+        else if (name.includes('.') === false) {
             indexed_array[name] = n['value'];
             continue;
         }
@@ -180,12 +182,12 @@ export function convertArrayToJson(nonIndexedArray: {name: string, value: any}[]
 
 
         if (previousParentIndex === null)
-            nestedProperty[property] = n['value'];
+            property ? nestedProperty[property] = n['value'] : nestedProperty = n['value'];
         else {
             if (nestedProperty[previousParentIndex] == null)
                 nestedProperty[previousParentIndex] = {};
 
-            nestedProperty[previousParentIndex][property] = n['value'];
+            property ? nestedProperty[previousParentIndex][property] = n['value'] : nestedProperty[previousParentIndex] = n['value'];
         }
     }
 

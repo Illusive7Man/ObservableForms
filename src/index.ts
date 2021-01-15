@@ -1,4 +1,3 @@
-export {registerAttributeValidators} from './validation/validation';
 export {Validators} from './validation/validators';
 export * from './common/misc';
 export {ConfigService} from './common/config';

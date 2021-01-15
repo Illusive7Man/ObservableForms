@@ -10,7 +10,7 @@ export class ConfigService {
      *
      * Example: adding an input element in a subtree of a form group will add it to the group.
      */
-    public static useMutationObservers = true;
+    static useMutationObservers = true;
 
     /**
      * List of selectors that will make any new, or removed, html element that matches any of them be skipped over
@@ -18,6 +18,25 @@ export class ConfigService {
      *
      * This is a performance config and it is not required in 99% of cases.
      */
-    public static excludedObserverElements: string[] = ['span.popper.validation'];
+    static excludedObserverElements: string[] = ['span.popper.validation'];
 
+
+    static registeredAttributeValidators: {[key: string]: ValidatorFn | ValidatorFn[]} = {};
+    /**
+     * Registers validator functions to use on an control that has the specified attribute. You could use this function multiple times, but it won't have an effect on existing form controls.
+     * @param attributeValidators Object that has desired attribute names as keys, whose value are validator functions.
+     */
+    static registerAttributeValidators(attributeValidators: {[key: string]: ValidatorFn | ValidatorFn[]}): void {
+        this.registeredAttributeValidators = {...this.registeredAttributeValidators, ...attributeValidators};
+    }
+
+    /**
+     * Maps error codes to validation messages to display to user;
+     *
+     * Example:
+     * ```typescript
+     * validationErrors.required = 'The field is required';
+     * ```
+     */
+    static validationErrors: {[key: string]: string} = {};
 }
