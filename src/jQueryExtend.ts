@@ -42,27 +42,24 @@ export function extendFormElements(): void {
         },
         attr(attributeName: string, value: any): JQuery<HTMLElement> {
 
-            let result = baseAttrFn.apply(this, arguments);;
-
             // Handle setting of disabled and type attributes
             if (attributeName !== 'disabled' && attributeName !== 'type' || value === undefined)
-                return result;
+                return baseAttrFn.apply(this, arguments);
 
-            this.each(function () {
-                if (value instanceof Function)
-                    return;
+            if (value instanceof Function)
+                return baseAttrFn.apply(this, arguments);
 
-                let control: JQueryInternal.JQueryInternal<FormControlType> = this.isFormControl || this.isFormGroup ? this : findCachedElement(this);
-                if (!control)
-                    return;
+            // List of controls that either been applied disabled attribute to, or have changed their type to, or from, 'hidden'.
+            let controlsToUpdate: JQueryInternal.JQueryInternal<FormControlType>[] = [];
 
-                if (attributeName === 'disabled')
-                    control.disabledSubject.next(value != null);
-
-                else if (attributeName === 'type' && [control[0].type, value].some(e => e === 'hidden') && [control[0].type, value].some(e => e !== 'hidden'))
-                    control.updateValidity();
-
+            this.each(function() {
+                let control: JQueryInternal.JQueryInternal<FormControlType> = findCachedElement(this) as any;
+                if (control && (attributeName === 'disabled' || attributeName === 'type' && [control[0].type, value].some(e => e === 'hidden') && [control[0].type, value].some(e => e !== 'hidden')))
+                    controlsToUpdate.push(control);
             });
+
+            let result = baseAttrFn.apply(this, arguments);
+            controlsToUpdate.forEach(control => attributeName === 'disabled' ? control.disabledSubject.next(value != null) : control.updateValidity());
 
             return result;
         },
