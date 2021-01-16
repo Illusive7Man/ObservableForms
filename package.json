@@ -53,5 +53,5 @@
     "bundle:ds": "dts-bundle-generator -o dist/index.d.ts lib/index.d.ts --inline-declare-global"
   },
   "type": "module",
-  "version": "0.9.0"
+  "version": "0.9.1"
 }
