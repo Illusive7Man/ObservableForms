@@ -5884,21 +5884,20 @@ function extendFormElements() {
             return baseValFn.apply(this, arguments);
         },
         attr(attributeName, value) {
-            let result = baseAttrFn.apply(this, arguments);
             // Handle setting of disabled and type attributes
             if (attributeName !== 'disabled' && attributeName !== 'type' || value === undefined)
-                return result;
+                return baseAttrFn.apply(this, arguments);
+            if (value instanceof Function)
+                return baseAttrFn.apply(this, arguments);
+            // List of controls that either been applied disabled attribute to, or have changed their type to, or from, 'hidden'.
+            let controlsToUpdate = [];
             this.each(function () {
-                if (value instanceof Function)
-                    return;
-                let control = this.isFormControl || this.isFormGroup ? this : findCachedElement(this);
-                if (!control)
-                    return;
-                if (attributeName === 'disabled')
-                    control.disabledSubject.next(value != null);
-                else if (attributeName === 'type' && [control[0].type, value].some(e => e === 'hidden') && [control[0].type, value].some(e => e !== 'hidden'))
-                    control.updateValidity();
+                let control = findCachedElement(this);
+                if (control && (attributeName === 'disabled' || attributeName === 'type' && [control[0].type, value].some(e => e === 'hidden') && [control[0].type, value].some(e => e !== 'hidden')))
+                    controlsToUpdate.push(control);
             });
+            let result = baseAttrFn.apply(this, arguments);
+            controlsToUpdate.forEach(control => attributeName === 'disabled' ? control.disabledSubject.next(value != null) : control.updateValidity());
             return result;
         },
         removeAttr(attributeName) {
