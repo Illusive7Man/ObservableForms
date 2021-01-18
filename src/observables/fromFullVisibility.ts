@@ -13,7 +13,7 @@ export function fromFullVisibility(target: HTMLElement): Observable<boolean> {
 
         let intersectionObserver = new IntersectionObserver(
             (entries, _) => subscriber.next(entries[0].intersectionRatio > .9), // sometimes it's .99...
-            {root: document.body, threshold: [0.5, 1]}
+            {root: target.parentElement, threshold: [0.5, 1]}
         );
 
         intersectionObserver.observe(target);
