@@ -1,4 +1,4 @@
-import {Observable} from "rxjs";
+import {NEVER, Observable} from "rxjs";
 
 /**
  * Creates an Observable that emits information whether the provided target element
@@ -8,6 +8,9 @@ import {Observable} from "rxjs";
  * @param target Html element whose visibility is inspected.
  */
 export function fromFullVisibility(target: HTMLElement): Observable<boolean> {
+
+    if (target == null)
+        return NEVER;
 
     return new Observable<boolean>(subscriber => {
 

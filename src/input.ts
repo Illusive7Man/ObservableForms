@@ -30,6 +30,7 @@ let formControl = function (jQueryObject): void {
 let formGroup = function (jQueryObject): void {
     originalInit.call(this, jQueryObject);
     this.isFormGroup = true;
+    this._ignoreUnnamedControls = true;
 };
 formControl.prototype = new originalInit();
 formGroup.prototype = new originalInit();
@@ -174,7 +175,7 @@ function addFormControlProperties(jQueryObject: JQuery<FormControlType | HTMLFor
                                   touchedUI$: Observable<void> = null,
                                   dirtyUI$: Observable<void> = null): void {
 
-    addComplementaryGettersSetters(jQueryObject);
+    addSimpleProperties(jQueryObject);
 
     jQueryObject.valueChangesSubject = new Subject<any>();
     jQueryObject.valueChanges = jQueryObject.valueChangesSubject.asObservable().pipe(   // Subject so it can be triggered
@@ -255,18 +256,30 @@ function getFormControlValue($formControl: JQuery<FormControlType>): string {
 function constructFormGroupValue(jQueryObject: JQuery<FormControlType | HTMLFormElement>): { [key: string]: any } {
     let nonameIdx = 0;
 
-    let nonIndexedArray = jQueryObject.controls
-        .filter($control => !$control.attr('disabled'))
-        .map($control => ({name: $control.attr('name') ?? '_noname' + nonameIdx++, value: $control.value}));
+    let controls = jQueryObject.controls;
+
+    if (jQueryObject.ignoreUnnamedControls === true)
+        controls = controls.filter($control => $control.attr('name'));
+
+    let nonIndexedArray = controls
+        .filter($control => !$control.attr('disabled'))             // Ignore disabled controls
+        .map($control => ({
+            name: $control.attr('name') ?? '_noname' + nonameIdx++, // To those without names, assign a new name (if not filtered out ↖)
+            value: $control.value
+        }));
 
     return convertArrayToJson(nonIndexedArray);
 }
 
 /**
  * Adds properties for touched - untouched, dirty - pristine.
+ * Also adds ignoreUnnamedControls in groups.
  * @param jQueryObject
  */
-function addComplementaryGettersSetters(jQueryObject: JQuery<FormControlType | HTMLFormElement>): void {
+function addSimpleProperties(jQueryObject: JQuery<FormControlType | HTMLFormElement>): void {
+
+    // Note: configurable option is set so the property can later be deleted if necessary.
+
     // touched
     Object.defineProperty(jQueryObject, 'touched', {
         get() {
@@ -314,6 +327,27 @@ function addComplementaryGettersSetters(jQueryObject: JQuery<FormControlType | H
         },
         configurable: true
     });
+
+
+    if (jQueryObject.isFormGroup) {
+
+        // ignoreUnnamedControls
+        Object.defineProperty(jQueryObject, 'ignoreUnnamedControls', {
+            get() {
+                return this._ignoreUnnamedControls;
+            },
+            set(value: boolean) {
+
+                if (!this.isFormGroup) {
+                    console.warn('ignoreUnnamedControls is used only in groups.')
+                    return;
+                }
+                this._ignoreUnnamedControls = value;
+                this.value = constructFormGroupValue(this); // update the value
+            },
+            configurable: true
+        });
+    }
 }
 
 /**

@@ -5199,6 +5199,9 @@ function isEventTarget(sourceObj) {
     return sourceObj && typeof sourceObj.addEventListener === 'function' && typeof sourceObj.removeEventListener === 'function';
 }
 
+/** PURE_IMPORTS_START _Observable,_util_noop PURE_IMPORTS_END */
+var NEVER = /*@__PURE__*/ new Observable(noop);
+
 /**
  * Creates an Observable that emits information whether the provided target element
  * occupies space in DOM, to its full extent.
@@ -5207,6 +5210,8 @@ function isEventTarget(sourceObj) {
  * @param target Html element whose visibility is inspected.
  */
 function fromFullVisibility(target) {
+    if (target == null)
+        return NEVER;
     return new Observable(subscriber => {
         let intersectionObserver = new IntersectionObserver((entries, _) => subscriber.next(entries[0].intersectionRatio > .9), // sometimes it's .99...
         { root: target.parentElement, threshold: [0.5, 1] });
@@ -5220,6 +5225,8 @@ function fromFullVisibility(target) {
  * @param target Html element on which resize event is observed.
  */
 function fromResize(target) {
+    if (target == null)
+        return NEVER;
     return new Observable(subscriber => {
         let resizeObserver = new ResizeObserver(_ => subscriber.next(null));
         resizeObserver.observe(target);
@@ -5280,6 +5287,7 @@ let formControl = function (jQueryObject) {
 let formGroup = function (jQueryObject) {
     originalInit.call(this, jQueryObject);
     this.isFormGroup = true;
+    this._ignoreUnnamedControls = true;
 };
 formControl.prototype = new originalInit();
 formGroup.prototype = new originalInit();
@@ -5375,7 +5383,7 @@ function convertToFormObject(jQueryObject, valueChangesUI = null, touchedUI$ = n
     return jQueryObject;
 }
 function addFormControlProperties(jQueryObject, valueChangesUI = null, touchedUI$ = null, dirtyUI$ = null) {
-    addComplementaryGettersSetters(jQueryObject);
+    addSimpleProperties(jQueryObject);
     jQueryObject.valueChangesSubject = new Subject();
     jQueryObject.valueChanges = jQueryObject.valueChangesSubject.asObservable().pipe(// Subject so it can be triggered
     map(value => { var _a, _b; return (_b = (_a = jQueryObject.valueMapFn) === null || _a === void 0 ? void 0 : _a.call(jQueryObject, value)) !== null && _b !== void 0 ? _b : value; }), // Custom mapping
@@ -5425,16 +5433,27 @@ function getFormControlValue($formControl) {
 }
 function constructFormGroupValue(jQueryObject) {
     let nonameIdx = 0;
-    let nonIndexedArray = jQueryObject.controls
-        .filter($control => !$control.attr('disabled'))
-        .map($control => { var _a; return ({ name: (_a = $control.attr('name')) !== null && _a !== void 0 ? _a : '_noname' + nonameIdx++, value: $control.value }); });
+    let controls = jQueryObject.controls;
+    if (jQueryObject.ignoreUnnamedControls === true)
+        controls = controls.filter($control => $control.attr('name'));
+    let nonIndexedArray = controls
+        .filter($control => !$control.attr('disabled')) // Ignore disabled controls
+        .map($control => {
+        var _a;
+        return ({
+            name: (_a = $control.attr('name')) !== null && _a !== void 0 ? _a : '_noname' + nonameIdx++,
+            value: $control.value
+        });
+    });
     return convertArrayToJson(nonIndexedArray);
 }
 /**
  * Adds properties for touched - untouched, dirty - pristine.
+ * Also adds ignoreUnnamedControls in groups.
  * @param jQueryObject
  */
-function addComplementaryGettersSetters(jQueryObject) {
+function addSimpleProperties(jQueryObject) {
+    // Note: configurable option is set so the property can later be deleted if necessary.
     // touched
     Object.defineProperty(jQueryObject, 'touched', {
         get() {
@@ -5479,6 +5498,23 @@ function addComplementaryGettersSetters(jQueryObject) {
         },
         configurable: true
     });
+    if (jQueryObject.isFormGroup) {
+        // ignoreUnnamedControls
+        Object.defineProperty(jQueryObject, 'ignoreUnnamedControls', {
+            get() {
+                return this._ignoreUnnamedControls;
+            },
+            set(value) {
+                if (!this.isFormGroup) {
+                    console.warn('ignoreUnnamedControls is used only in groups.');
+                    return;
+                }
+                this._ignoreUnnamedControls = value;
+                this.value = constructFormGroupValue(this); // update the value
+            },
+            configurable: true
+        });
+    }
 }
 /**
  * Function called by the controls setter when number of controls is over one.
@@ -5803,7 +5839,7 @@ function determinePopperPositioning(jQueryObject) {
             $reference = getCommonAncestor(...references);
     }
     // Handle empty controls
-    $reference = $reference !== null && $reference !== void 0 ? $reference : $();
+    $reference = $reference !== null && $reference !== void 0 ? $reference : jQueryObject;
     return { $reference, placement: determinePlacement(jQueryObject, $reference[0]) };
 }
 /**

@@ -336,7 +336,7 @@ function determinePopperPositioning(jQueryObject: JQuery<FormControlType | HTMLF
     }
 
     // Handle empty controls
-    $reference = $reference ?? $() as any;
+    $reference = $reference ?? jQueryObject as any;
 
     return {$reference, placement: determinePlacement(jQueryObject, $reference[0])}
 }

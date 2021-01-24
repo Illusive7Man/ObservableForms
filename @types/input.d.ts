@@ -254,6 +254,16 @@ declare global {
          * Removes added properties from group and its controls and stops observing their (listening for) events.
          */
         destroyGroup(): void;
+        /**
+         * Sets a new value for the form control.
+         */
+        val(value: any): this;
+        /**
+         * Should `val()` and `valueChanges`, of a group, ignore controls that don't have a name defined.
+         *
+         * E.g. Input fields without name attribute.
+         */
+        ignoreUnnamedControls: boolean;
     }
 }
 
