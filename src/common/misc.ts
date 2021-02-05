@@ -128,15 +128,15 @@ export function getRadioValue(jQueryObject: JQuery<HTMLInputElement>): string {
 
 /**
  * Converts array of form data to json.
- * @param nonIndexedArray Array of name-value pairs.
+ * @param unindexedArray Array of name-value pairs.
  */
-export function convertArrayToJson(nonIndexedArray: {name: string, value: any}[]): any {
+export function convertArrayToJson(unindexedArray: {name: string, value: any}[]): any {
     let indexed_array = {};
 
     // Regex which captures index value
     let arrayRx = /\[(\d+)]$/;
 
-    for (let n of nonIndexedArray) {
+    for (let n of unindexedArray) {
 
         let name = n['name'];
 
@@ -191,32 +191,27 @@ export function convertArrayToJson(nonIndexedArray: {name: string, value: any}[]
         }
     }
 
-    return removeEmptyArrayElements(indexed_array);
+    return indexed_array;
 }
 
 /**
- * Removes null / empty elements from the object elements.
- * Useful when creating json representation of the form, since its arrays' elements might not be in sequence.
+ * Converts json to array of form data.
  */
-function removeEmptyArrayElements(object: any): any {
-    if (object instanceof Object) {
-        for (let entry of Object.entries(object)) {
-            let key = entry[0];
-            let value = entry[1];
+export function convertJsonToArray(value: any, name?: string): {name: string, value: any}[] {
+    let unindexedArray: {name: string, value: any}[] = [];
 
-            if (value instanceof Array)
-                object[key] = value.filter(e => e != null).map(e => removeEmptyArrayElements(e))
+    name = name || '';
+    if (typeof value === 'object' && value != null) {
+        for (let [index, val] of Object.entries(value)) {
+            let newName = name == '' ? index : val instanceof Array ? name + '[' + index + ']' : name + '.' + index;
 
-
-            else if (value instanceof Object)
-                object[key] = removeEmptyArrayElements(value);
-
+            unindexedArray.push(...convertJsonToArray(val, newName));
         }
-    } else if (object instanceof Array) {
-        object = object.filter(e => e != null).map(e => removeEmptyArrayElements(e));
+    } else {
+        unindexedArray.push({name, value});
     }
 
-    return object;
+    return unindexedArray;
 }
 
 

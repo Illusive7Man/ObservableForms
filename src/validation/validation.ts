@@ -41,13 +41,14 @@ export function enableValidation(jQueryObject: JQuery<FormControlType | HTMLForm
     /*** statusChanges ***/
     jQueryObject.statusChanges = jQueryObject.controls$.pipe(
         switchMap(controls => merge(
-        jQueryObject.isFormControl ? jQueryObject.valueChanges : merge(...controls.map($formControl => $formControl.statusChanges)).pipe(delay(1)),
+        jQueryObject.isFormControl ? jQueryObject.valueChanges : merge(...controls.map($formControl => $formControl.statusChanges.pipe(delay(1)))),
             jQueryObject.manualValidityUpdateSubject.asObservable(),
             jQueryObject.disabledSubject
         ).pipe(startWith(''))),
         // Note 1: Controls update status on value change
         // Note 2: Groups when their controls change status (which supersedes valueChanges)
         // Note 3: startWith() updates validity when the controls array changes
+        // Note 4: delay() on statusChanges makes sure group's status is calculated AFTER group's value is calculated
 
         startWith(''),
         tap(_ => jQueryObject.errors = jQueryObject.getValidators()?.map(validatorFn => validatorFn(jQueryObject)).reduce((acc, curr) => curr ? {...acc, ...curr} : acc, null)),
@@ -168,7 +169,7 @@ export function attachPopper(jQueryObject: JQuery<FormControlType | HTMLFormElem
     jQueryObject.controls$.subscribe(null, null, () => {v$.unsubscribe(); r$.unsubscribe();});
 
     // Handle display of errors
-    let dirtyObservable$ = jQueryObject.dirtySubject.asObservable().pipe(filter(_ => jQueryObject.controls.every($c => $c.dirty)), distinctUntilChanged());
+    let dirtyObservable$ = jQueryObject.dirtySubject.asObservable().pipe(map(_ => jQueryObject.controls.every($c => $c.dirty)), distinctUntilChanged());
 
     let popperShownSubject = new BehaviorSubject<boolean>(false);
     jQueryObject.isValidityMessageShown$ = popperShownSubject.asObservable().pipe(distinctUntilChanged());
@@ -194,7 +195,7 @@ export function attachPopper(jQueryObject: JQuery<FormControlType | HTMLFormElem
                     
                 let errorMessage = Object.keys(jQueryObject.errors).map(key => typeof jQueryObject.errors[key] === 'string' ? jQueryObject.errors[key] : validationErrors[key]).join('\n');
 
-                $popper.find('.field-validation').addClass('field-validation-error').html(errorMessage);
+                errorMessage && $popper.find('.field-validation').addClass('field-validation-error').html(errorMessage);
                 
                 if (enabled) {
                     $popper.show();

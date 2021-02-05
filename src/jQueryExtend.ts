@@ -1,7 +1,7 @@
 import {combineControls, findFormControls, FormControlStatus, isValidFormControl} from "./common/misc";
 import {disableValidation, enableValidation, getValidators, hasError, setValidators, updateValidity} from "./validation/validation";
 import {Observable} from "rxjs";
-import {asFormControl, asFormGroup, destroyControl, destroyGroup, overriddenConstructor} from "./input";
+import {asFormControl, asFormGroup, destroyControl, destroyGroup, overriddenConstructor, patchValue, reset, setValue} from "./input";
 import {JQueryInternal} from "../@types/input";
 import {cachedControlsAndGroups, findCachedElement, removeFromCache} from "./common/cache";
 import {ConfigService} from "./common/config";
@@ -16,29 +16,28 @@ export function extendFormElements(): void {
 
             // Gets the value
             if (value === undefined) {
+
                 if (this.isFormGroup || this.isFormControl)
                     return this.value;
 
                 return baseValFn.apply(this, arguments);
             }
 
-            // Sets the value (functions not yet supported)
-            if (!(value instanceof Function)) {
-                let result = baseValFn.apply(this, arguments);
+            // functions not yet supported
+            if (value instanceof Function)
+                return baseValFn.apply(this, arguments);
 
-                if (this.isFormControl || this.isFormGroup)
-                    this.valueChangesSubject.next(value as string);
-                else if (this.length === 1 && isValidFormControl(this[0])) {
-                    let cachedFormControl = findCachedElement(this);
-                    if (cachedFormControl)
-                        cachedFormControl.valueChangesSubject.next(value as string);
-                }
+            // Form controls and groups use a custom update logic
+            if (this.isFormControl || this.isFormGroup)
+                setValue(this, value);
+            else if (this.length === 1 && isValidFormControl(this[0])) {
+                let cachedFormControl = findCachedElement(this);
+                if (cachedFormControl)
+                    setValue(cachedFormControl as any, value);
+            } else
+                baseValFn.apply(this, arguments);
 
-                return result;
-            }
-
-            // If its sets a function, return default
-            return baseValFn.apply(this, arguments);
+            return this;
         },
         attr(attributeName: string, value: any): JQuery<HTMLElement> {
 
@@ -134,23 +133,11 @@ export function extendFormElements(): void {
         hasError(errorCode: string): boolean {
             return hasError(this, errorCode);
         },
+        patchValue(value: {[key: string]: any}): void {
+            patchValue(this, value);
+        },
         reset(): void {
-            this.markAsUntouched();
-            this.markAsPristine();
-
-            // TODO: handle if there's more than one form
-            if (this[0] instanceof HTMLFormElement) {
-                this[0].reset();
-                return;
-            }
-
-            this.val('');
-
-            this.controls.forEach($c => {
-                $c.markAsUntouched();
-                $c.markAsPristine();
-                $c.val('');
-            })
+            reset(this);
         },
         logErrors(): void {
             if (this.errors)

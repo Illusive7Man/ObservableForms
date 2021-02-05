@@ -308,13 +308,16 @@ declare namespace JQueryInternal {
         valueChanges: Observable<any>;
         valueChangesSubject: Subject<any>;
         valueMapFn: (value: any) => any;
+        /**
+         * When group's value changes directly, trigger valueChanges only once.
+         */
+        updateGroupOncePause: boolean;
         statusChanges: Observable<FormControlStatus>;
         /**
-         * Used to programatically update the validity of the form control.
+         * Used to programmatically update the validity of the form control.
          */
         manualValidityUpdateSubject: Subject<void>;
         _validators: ValidatorFn[] | null;
-        public _setInitialStatus;
         public _existingValidationSubscription;
         _controls: JQueryInternal<FormControlType>[];
         controls: JQueryInternal<FormControlType>[];

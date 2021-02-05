@@ -1,10 +1,12 @@
 import nodeResolve from "@rollup/plugin-node-resolve";
+import sourcemaps from "rollup-plugin-sourcemaps";
 
 export default [{
     input: 'lib/index.js',
     output: {
         file: 'dist/index.js',
-        format: 'esm'
+        format: 'esm',
+        sourcemap: true
     },
     name: 'dnn',
     plugins: [
@@ -14,7 +16,8 @@ export default [{
             jsnext: true,
             main: true,
             modulesOnly: true
-        })
+        }),
+        sourcemaps()
     ]
     }
 ]

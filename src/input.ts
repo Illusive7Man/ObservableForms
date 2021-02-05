@@ -3,7 +3,7 @@ import {delay, distinctUntilChanged, filter, map, share, skip, startWith, switch
 import {
     checkIfCheckboxControl,
     checkIfRadioControl, combineControls,
-    combineRadiosAndCheckboxes, convertArrayToJson,
+    combineRadiosAndCheckboxes, convertArrayToJson, convertJsonToArray,
     getCheckboxElements,
     getCheckboxValue,
     getRadioValue,
@@ -189,7 +189,7 @@ function addFormControlProperties(jQueryObject: JQuery<FormControlType | HTMLFor
         : jQueryObject.controls$.pipe(
             switchMap(_ => jQueryObject.isFormControl
                 ? fromEvent(jQueryObject, 'input').pipe(startWith(''), map(_ => getFormControlValue(jQueryObject as JQuery<FormControlType>)))
-                : merge(...jQueryObject.controls.flatMap($c => [$c.valueChanges, $c.disabledSubject])).pipe(delay(1), startWith(''), map(_ => constructFormGroupValue(jQueryObject)))
+                : merge(...jQueryObject.controls.flatMap($c => [$c.valueChanges, $c.disabledSubject])).pipe(filter(_ => !jQueryObject.updateGroupOncePause), delay(1), startWith(''), map(_ => constructFormGroupValue(jQueryObject)))
                 // Note 1: startWith() sets the value when the controls array changes
                 // Note 2: delay makes sure value change of an individual control would trigger its subscription handlers before group one's would. (RxJS is synchronous by default)
 
@@ -225,7 +225,7 @@ function addFormControlProperties(jQueryObject: JQuery<FormControlType | HTMLFor
         ? dirtyUI$
         : jQueryObject.controls$.pipe(
             switchMap(_ => jQueryObject.isFormControl
-                ? jQueryObject.valueChanges
+                ? valueChangesUI
                 : merge(...jQueryObject.controls.map($formControl => $formControl.dirtySubject.asObservable())).pipe(filter(isDirty => isDirty), delay(1))
             )) as any;
 
@@ -237,6 +237,93 @@ function addFormControlProperties(jQueryObject: JQuery<FormControlType | HTMLFor
     jQueryObject.disabledSubject = new Subject<boolean>();
 
     jQueryObject.subscriptions.add(s1).add(s2).add(s3);
+}
+
+/**
+ * Sets the value of the Form Group. It accepts an object that matches the structure of the group, with control names as keys.
+ */
+export function setValue(jQueryObject: JQuery<FormControlType | HTMLFormElement>, value: {[key: string]: any} | string): void {
+
+    // Control's setValue() is a bit different from a default val()
+    if (jQueryObject.isFormControl) {
+        value = value as string;
+
+        let isCheckbox = checkIfCheckboxControl(jQueryObject);
+        let isRadio = checkIfRadioControl(jQueryObject);
+
+        if (isCheckbox) {
+            let shouldBeChecked = jQueryObject.filter('[type=checkbox]').val() === value.toString();
+            jQueryObject.filter('[type=checkbox]').prop('checked', shouldBeChecked);
+        } else if (isRadio) {
+            value !== ''
+                ? jQueryObject.filter('[value=' + value + ']').prop('checked', true)
+                : jQueryObject.prop('checked', false);
+        }
+        else
+            jQueryObject[0].value = value;
+
+        jQueryObject.valueChangesSubject.next(value);
+        return;
+    }
+
+    let unindexedValue = convertJsonToArray(value as {[key: string]: any});
+
+    // Groups apply all of the provided values
+    checkAllValuesPresent(jQueryObject, unindexedValue);
+
+    jQueryObject.updateGroupOncePause = true;
+
+    for (let {name, value} of unindexedValue) {
+        throwIfControlMissing(jQueryObject, name);
+        jQueryObject.controls.find($control => $control.attr('name') === name).val(value);
+    }
+
+    jQueryObject.valueChangesSubject.next(value);
+    jQueryObject.updateGroupOncePause = false;
+}
+
+/**
+ * Patches the value of the Form Group. It accepts an object with control names as keys, and does its best to match the values to the correct controls in the group.
+ */
+export function patchValue($formGroup: JQuery<FormControlType | HTMLFormElement>, value: {[key: string]: any}): void {
+
+    let unindexedValue = convertJsonToArray(value as {[key: string]: any});
+
+    $formGroup.updateGroupOncePause = true;
+
+    for (let {name, value} of unindexedValue) {
+        $formGroup.controls.find($control => $control.attr('name') === name)?.val(value);
+    }
+
+    $formGroup.valueChangesSubject.next({...$formGroup.value, ...value});
+    $formGroup.updateGroupOncePause = false;
+}
+
+/**
+ * Resets the Form Group, marks all descendants pristine and untouched and sets the value of all descendants to null.
+ */
+export function reset(jQueryObject: JQuery<FormControlType | HTMLFormElement>): void {
+
+    jQueryObject.markAsUntouched();
+    jQueryObject.markAsPristine();
+
+    if (jQueryObject.isFormControl) {
+        jQueryObject.val('');
+
+    } else {
+        jQueryObject.updateGroupOncePause = true;
+
+        jQueryObject.controls.forEach($control => {
+            $control.markAsUntouched();
+            $control.markAsPristine();
+            $control.val('');
+        });
+
+        jQueryObject.val(constructFormGroupValue(jQueryObject));
+
+        jQueryObject.updateGroupOncePause = false;
+    }
+
 }
 
 
@@ -351,6 +438,24 @@ function addSimpleProperties(jQueryObject: JQuery<FormControlType | HTMLFormElem
 }
 
 /**
+ * Makes sure every control in the group is present in the unindexedValue object.
+ */
+function checkAllValuesPresent($formGroup: JQuery<FormControlType | HTMLFormElement>, unindexedValue: {name: string, value: any}[]): void {
+
+    let controlNames = $formGroup.controls.filter($control => !$control.attr('disabled')).map($control => $control.attr('name')).filter(name => name);
+
+    for (let name of controlNames)
+        if (unindexedValue.find(e => e.name === name) === undefined)
+            throw new Error(`Must supply a value for form control with name: '${name}'.`);
+
+}
+
+function throwIfControlMissing($formGroup: JQuery<FormControlType | HTMLFormElement>, name: string): void {
+    if ($formGroup.controls.map($control => $control.attr('name')).every(controlName => controlName !== name))
+        throw new Error(`Cannot find form control with name: ${name}.`);
+}
+
+/**
  * Function called by the controls setter when number of controls is over one.
  * State is copied over into the new group.
  * Any transformations by other files need to be registered.
@@ -432,10 +537,12 @@ export function destroyControl(jQueryObject: JQuery<FormControlType | HTMLFormEl
     delete jQueryObject.untouched;
     delete jQueryObject.dirty;
     delete jQueryObject.pristine;
+    delete jQueryObject.ignoreUnnamedControls;
     delete (jQueryObject as any)._touched;
     delete (jQueryObject as any)._untouched;
     delete (jQueryObject as any)._dirty;
     delete (jQueryObject as any)._pristine;
+    delete (jQueryObject as any)._ignoreUnnamedControls;
 
     removeFromCache(jQueryObject);
     delete jQueryObject._controls;
