@@ -2,7 +2,8 @@
 /node_modules/
 /lib
 /dist
-/css/!*.scss
+/css/*.css
+/css/*.map
 
 .idea
 observable-forms-**.tgz
