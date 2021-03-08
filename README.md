@@ -1,85 +1,150 @@
-# Observable Forms plug-in for jQuery
+# Observable Forms plug-in for jQuery [![npm version](https://badge.fury.io/js/observable-forms.svg)](http://badge.fury.io/js/observable-forms)
 Inspired by Angular's forms.
 <br/>
 <br/>
 
-Adds observable streams to jQuery objects of selected form elements. <br/>
-Properties such as 
-- valueChanges
-- statusChanges 
-- touched, untouched, dirty, pristine
-- setValidators
 
-and many more, are added to the jQuery object: `let $formControl = $('#some-input')`.<br />
-List of properties can be found in the [type file](@types/input.d.ts).
-<br/><br/>
 
-Controlling form's behavior and validation in Angular is such a straightforward task that I had to implement some of the workflow in jQuery.<br/>
-It is mostly thanks to reactive programming (RxJS), which is made possible by these observable streams.<br/>
-_Note that Visual Studio, JetBrains, and possibly every other code editor, will have type support and offer documentation for the added properties._
 
-#### Prerequisites:
-- If you have a knowledge of RxJS and are using jQuery on your site, this plug-in is a must.<br/>
-- If you don't know RxJS, you might want to see if the basic usage of the plug-in is usable to you, i.e. how it handles front-end validation, and what additional API it offers for you to take advantage of. 
+With this library, you can create an interactive representation of your html form,
+whose API is based on reactive patterns.<br/>
+Instead of manually selecting and attaching the JavaScript code to form's elements,
+more direct, explicit access to elements' functionalities is provided through objects called `FormControl` and `FormGroup`.<br/>
+
+##### Prerequisites:
+- Basic knowledge of RxJS is desirable.<br/>
+
+##### Table of Contents
+[Functionality](#functionality)<br/>
+[Usage](#usage)<br/>
+[Demos](#demos)<br/>
+[Installation](#installation)<br/>
+
+<a name="functionality"/>
+
+## Functionality
+A `FormControl` represents a single form element, e.g. a single text input, or a set of radio inputs with the same name,
+and a `FormGroup` represents a collection of those controls, e.g. a form.<br/>
+These objects have properties describing the elements they reference, such as:
+- value
+- touched&emsp;- _has the user interacted with the element(s) at all_
+- dirty&emsp;&emsp;&nbsp; - _has the user changed element(s) value_
+- valid
+- disabled
+
+along with the methods to change these properties, and observable streams, `valueChanges` and `statusChanges`,
+that track the value and status (valid, invalid or disabled) of the element(s).<br/>
+These properties and methods were designed to replace the usual handling of events and changing of attributes 
+when working with a form, and make the implementation of form validation
+and custom form behavior as straightforward as possible.
+
+<a name="usage"/>
 
 ## Usage
-By the default behavior of the overridden jQuery constructor, a form control is an extended jQuery object of a single selected input element.
-A form group is an extended object of selected input elements (plural), or a form.<br/>
-Form controls and form groups can also be initialized from any jQueryObject programmatically.<br/>
-Showcase section below will demo the features of controls and groups, and have a detailed explanation of the example's behaviour in those demos.
+Creating and using a form control is pretty simple:
 
-``` javascript
-let $formControl1 = $('#some-input');
-let $formControl2 = $('#some-non-input-element').asFormControl();
-let $formGroup1   = $('#some-input, #some-select');
-let $formGroup2   = $('#some-form')
-let $formGroup3   = $('#some-non-input-element').asFormGroup();
+```typescript
+import {switchMap, tap} from "rxjs/operators";
+import {FormControlStatus} from "./types";
+
+let firstName = $('#firstName').asFormControl().enableValidation();
+firstName.valueChanges.subscribe(value => console.log('My new value is: ' + value));
+
+// ...
+// Let's try something a bit more complicated
+
+let deliveryAddress = $('#delivery-address').asFormControl();
+let paymentAddress = $('#payment-address').asFormControl().enableValidation();
+
+let isPaymentDifferentFromDelivery$ = $('#different-checkbox').asFormControl().valueChanges
+    .pipe(map(value => value.toLowerCase() === 'true'), startWith('false'));
+
+isPaymentDifferentFromDelivery$.pipe(switchMap(isDifferent => isDifferent
+    ? paymentAddress.statusChanges.pipe(tap(status => 
+        status === FormControlStatus.INVALID ? alert('Entered address is not valid') : null))
+    : deliveryAddress.valueChanges.pipe(value => paymentAddress.setValue(value))
+)).subscribe();
 ```
-The overridden constructor will detect that selected elements are inputs and add the needed properties.
-Due to performance issues that might occur when using other jQuery libraries, querying methods such as
-find, children, siblings, etc., will not create form controls out of the results automatically,
-but you can always transform them programmatically.<br/>
+<br/><br/>
+Form group aggregates controls found in the subtree of the selected element(s) into one object,
+with each control's name as the key. Name is either control's `name` attribute or one manually provided.<br/>
+Class of this object accepts a type parameter representing the model of the form group,
+which provides type checking when working with the controls.<br/><br/>
+_Author's note: The best way to have full stack type checking is to find a tool
+that will generate TypeScript versions of your backend classes, and use those as type parameters of form groups._
 
-##### Default controls / groups
-```html
-<form>, <input>, <select>, <textarea>
+
+Some features of the FormGroup objects are:
+- The value is a JSON object of selected controls and their values.
+- Its validity is affected by the validity of the controls.
+- Controls can be added and removed from the group.
+
+```typescript
+class MyForm {
+    fullName: string;
+    isSubscriber: boolean;
+    addresses: {street: string; city: string}[];
+}
+
+// Type checking !!
+let form = $('form').asFormGroup<MyForm>();
+form.controls.fullName.valueChanges.subscribe(_ => '...')
+form.controls.addresses[0].city.valueChanges.subscribe(_ => '...');
+console.log(form.value.isSubscriber);
 ```
-Type checkbox and radio are supported also. 
 
-## Showcases
+Descriptions of properties and methods of FormControl class are listed in [this file](./lib/formControl.d.ts),
+and [this file](./lib/formGroup.d.ts) has descriptions for FormGroup.
+
+
+_Important note: Type checking is available in both JavaScript and TypeScript projects._
+
+
+<a name="demos"/>
+
+## Demos
 These demos will try to cover as many possible scenarios as possible, such as:
 - changing element's types
 - disabling/enabling form controls
 - removing controls from the DOM
-- adding new controls to the DOM (some group's subtree)
-- handling Web Components
-- changing form's data / resetting (not yet implemented)
+- adding new controls to the DOM
+- handling [Web Components](https://developer.mozilla.org/en-US/docs/Web/Web_Components)
+- changing form's data / resetting
 - handling arrays
-- resolution dependent behavior of validation css
 
 _Note: These demos are hosted on codesandbox, and code behind the forms can be accessed using the "Open Sandbox" button.
 Fullscreen view is preferable, considering the style of validation messages.
-Configuration of that styling will be more detailed / made easier in the future._<br/>
-_Note 2: AFAIK, on codesandbox it's not possible to reference installed modules from .html files,
-so I am referencing my package from CDN url. On the local machine referencing node_modules folder is possible, and that adds the type support._ 
+Styling will be configurable in the future versions._<br/>
+ 
 ### Demo 1 - "A standard form"
+A JavaScript project covering a lot of library's functionalities, and shows how to integrate type checking into JavaScript code.<br/>
 https://b1h75.csb.app/
+
+_Note: that CodeSandbox has same built-in js bundler that allows non-standard imports in .js files.
+Below those imports are comments on how they should be used plain .js files._<br/>
+<br/>
+### Demo 2 - "Custom made"
+A TypeScript project covering custom form controls. Also demonstrates support for Web Components.<br/>
+https://dxrdg.csb.app/
+
+
+<a name="installation"/>
 
 ## Installation
 ### ES6 via npm
-`npm i observable-forms` <br/>
-Editor support (autocomplete, documentation) included when using this method.
+`npm i observable-forms` <br/><br/>
+Inside a html script tag, or in javascript:
 ```html
 <script type="module">
 import {} from "./node_modules/observable-forms/dist/index.js";
-// Any import is required so the library would self initialize.
+// Library self initializes when module is loaded.
 
 let $formControl = $('input').valueChanges.subscribe(val => console.log(val));
 ...
 </script>
 ```
 
-or, in Javascript / Typescript
+or, in Typescript:
 ```javascript
 import {ConfigService, Validators} from "observable-forms";
 
@@ -91,11 +156,11 @@ ConfigService.registerAttributeValidators({
 ```
 ### CDN
 For CDN, you can use [unpkg](https://unpkg.com/): <br/>
-https://unpkg.com/observable-forms/dist/index.min.js
+https://unpkg.com/observable-forms/dist/index.js
 
 ```html
 <script type="module">
-import {} from "https://unpkg.com/observable-forms/dist/index.min.js";
+import {} from "https://unpkg.com/observable-forms/dist/index.js";
 ...
 </script>
 ```
