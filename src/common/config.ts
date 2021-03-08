@@ -1,7 +1,9 @@
-
 /**
  * Used for global configuration.
  */
+import { observeShadowRoot, stopObservingShadowRoot } from "./controlObserver";
+import {ValidatorFn} from "./types";
+
 export class ConfigService {
 
     /**
@@ -19,6 +21,15 @@ export class ConfigService {
      * This is a performance config and it is not required in 99% of cases.
      */
     static excludedObserverElements: string[] = ['span.popper.validation'];
+
+
+    static observeShadowRoot(shadowRoot: ShadowRoot): void  {
+        observeShadowRoot(shadowRoot);
+    }
+
+    static stopObservingShadowRoot(shadowRoot: ShadowRoot): void {
+        stopObservingShadowRoot(shadowRoot);
+    }
 
 
     static registeredAttributeValidators: {[key: string]: ValidatorFn | ValidatorFn[]} = {};

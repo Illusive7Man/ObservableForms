@@ -1,4 +1,5 @@
-import {Observable} from "rxjs";
+import {NEVER, Observable} from "rxjs";
+import {debounceTime} from "rxjs/operators";
 
 /**
  * Creates an Observable that emits information whether the provided target element
@@ -9,15 +10,22 @@ import {Observable} from "rxjs";
  */
 export function fromFullVisibility(target: HTMLElement): Observable<boolean> {
 
+    if (target == null)
+        return NEVER;
+
     return new Observable<boolean>(subscriber => {
 
-        let intersectionObserver = new IntersectionObserver(
+        // Observing document is like observing the viewport (triggers on scroll)
+        // Observing body doesn't handles the display: none (kinda does handle the overflow)
+        // Parent element handles display perfectly, but doesn't ha
+
+        let documentIntersectionObserver = new IntersectionObserver(
             (entries, _) => subscriber.next(entries[0].intersectionRatio > .9), // sometimes it's .99...
             {root: target.parentElement, threshold: [0.5, 1]}
         );
 
-        intersectionObserver.observe(target);
+        documentIntersectionObserver.observe(target);
 
-        subscriber.add(_ => intersectionObserver.disconnect());
+        subscriber.add(_ => documentIntersectionObserver.disconnect());
     });
 }
