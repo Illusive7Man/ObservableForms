@@ -1,6 +1,9 @@
 # Project exclude paths
 /node_modules/
 /lib
+/dist
+/css/*.css
+/css/*.map
 
 .idea
 observable-forms-**.tgz

@@ -9,24 +9,21 @@
   },
   "files": [
     "css/*",
-    "@types/*",
     "dist/*",
     "lib/*"
   ],
   "dependencies": {
     "@popperjs/core": "^2.5.3",
-    "rxjs": "^6.6.3"
+    "@types/resize-observer-browser": "^0.1.4",
+    "rxjs": "6.x"
   },
   "devDependencies": {
-    "@rollup/plugin-node-resolve": "^9.0.0",
-    "@rollup/plugin-typescript": "^6.1.0",
     "@types/jquery": "^3.5.5",
-    "@types/resize-observer-browser": "^0.1.4",
-    "rollup": "^2.28.1",
-    "rollup-plugin-sourcemaps": "^0.6.2",
-    "rollup-plugin-terser": "^7.0.2",
+    "chokidar": "^3.5.1",
+    "esbuild": "^0.8.32",
     "tslib": "^2.0.1",
-    "typescript": "^3.9.7"
+    "typescript": "^4.1.3",
+    "dts-bundle-generator": "^5.6.0"
   },
   "description": "Adds observable streams to jQuery objects of forms and form inputs. Adds properties such as valueChanges and statusChanges (inspired by Angular) to $('#some-input').",
   "homepage": "https://github.com/Illusive7Man/ObservableForms",
@@ -37,7 +34,7 @@
     "observable",
     "reactive"
   ],
-  "license": "Apache-2.0",
+  "license": "MIT",
   "main": "lib/index.js",
   "name": "observable-forms",
   "repository": {
@@ -45,11 +42,10 @@
     "url": "git+https://github.com/Illusive7Man/ObservableForms.git"
   },
   "scripts": {
-    "clean": "if exist dist rmdir /s /q dist",
-    "build": "npm run clean && tsc --project tsconfig.json && npm run bundle:esm && npm run bundle:esm:min",
-    "bundle:esm": "rollup -c",
-    "bundle:esm:min": "terser --ecma 6 --compress --mangle --module -o dist/index.min.js -- dist/index.js"
+    "build": "node esbuild.config.js",
+    "bundle:ds": "dts-bundle-generator -o dist/index.d.ts lib/index.d.ts --inline-declare-global"
   },
   "type": "module",
-  "version": "0.8.3"
+  "types": "dist/index.d.ts",
+  "version": "0.9.4"
 }

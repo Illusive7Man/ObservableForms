@@ -9,7 +9,8 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {checkIfRadioGroup, isNullOrWhitespace as isEmptyInputValue} from "./misc";
+import {checkIfCheckboxControl, checkIfRadioControl, isNullOrWhitespace as isEmptyInputValue} from "../common/misc";
+import {AbstractControl} from "../abstractControl";
 
 /**
  * A regular expression that matches valid e-mail addresses.
@@ -79,18 +80,18 @@ export class Validators {
      */
     static min(min) {
         return (/**
-         * @param {?} $control
+         * @param {?} control
          * @return {?}
          */
-        ($control) => {
-            if (isEmptyInputValue($control.val()) || isEmptyInputValue(min)) {
+        (control: AbstractControl) => {
+            if (isEmptyInputValue(control.value) || isEmptyInputValue(min)) {
                 return null; // don't validate empty values to allow optional controls
             }
             /** @type {?} */
-            const value = parseFloat($control.val());
+            const value = parseFloat(control.value);
             // Controls with NaN values after parsing should be treated as not having a
             // minimum, per the HTML forms spec: https://www.w3.org/TR/html5/forms.html#attr-input-min
-            return !isNaN(value) && value < min ? { 'min': { 'min': min, 'actual': $control.val() } } : null;
+            return !isNaN(value) && value < min ? { 'min': { 'min': min, 'actual': control.value } } : null;
         });
     }
     /**
@@ -117,18 +118,18 @@ export class Validators {
      */
     static max(max) {
         return (/**
-         * @param {?} $control
+         * @param {?} control
          * @return {?}
          */
-        ($control) => {
-            if (isEmptyInputValue($control.val()) || isEmptyInputValue(max)) {
+        (control: AbstractControl) => {
+            if (isEmptyInputValue(control.value) || isEmptyInputValue(max)) {
                 return null; // don't validate empty values to allow optional controls
             }
             /** @type {?} */
-            const value = parseFloat($control.val());
+            const value = parseFloat(control.value);
             // Controls with NaN values after parsing should be treated as not having a
             // maximum, per the HTML forms spec: https://www.w3.org/TR/html5/forms.html#attr-input-max
-            return !isNaN(value) && value > max ? { 'max': { 'max': max, 'actual': $control.val() } } : null;
+            return !isNaN(value) && value > max ? { 'max': { 'max': max, 'actual': control.value } } : null;
         });
     }
     /**
@@ -147,14 +148,24 @@ export class Validators {
      *
      * @see `updateValueAndValidity()`
      *
-     * @param {?} $control
+     * @param {?} control
      * @return {?} An error map with the `required` property
      * if the validation check fails, otherwise `null`.
      *
      */
-    static required($control) {
-        let isRadioControl = checkIfRadioGroup($control);
-        return isRadioControl && $control.toArray().every(element => !element.checked) || !isRadioControl && isEmptyInputValue($control.val()) ? { 'required': true } : null;
+    static required(control: AbstractControl) {
+        let isRadioControl = checkIfRadioControl(control.toJQuery());
+        let isCheckboxControl = checkIfCheckboxControl(control.toJQuery());
+
+        let hasValue = true;
+        if (isRadioControl && control.toJQuery().toArray().every((element: HTMLInputElement) => !element.checked))
+            hasValue = false;
+        else if (isCheckboxControl && control.toJQuery().filter('[type=checkbox]').is(':checked') === false)
+            hasValue = false;
+        else if (!isRadioControl && !isCheckboxControl && isEmptyInputValue(control.value))
+            hasValue = false;
+
+        return hasValue ? null : { 'required': true };
     }
     /**
      * \@description
@@ -173,13 +184,13 @@ export class Validators {
      *
      * @see `updateValueAndValidity()`
      *
-     * @param {?} $control
+     * @param {?} control
      * @return {?} An error map that contains the `required` property
      * set to `true` if the validation check fails, otherwise `null`.
      *
      */
-    static requiredTrue($control) {
-        return $control.val().toLowerCase() === 'true' ? null : { 'required': true };
+    static requiredTrue(control: AbstractControl) {
+        return control.value.toLowerCase() === 'true' ? null : { 'required': true };
     }
     /**
      * \@description
@@ -211,16 +222,16 @@ export class Validators {
      *
      * @see `updateValueAndValidity()`
      *
-     * @param {?} $control
+     * @param {?} control
      * @return {?} An error map with the `email` property
      * if the validation check fails, otherwise `null`.
      *
      */
-    static email($control) {
-        if (isEmptyInputValue($control.val())) {
+    static email(control: AbstractControl) {
+        if (isEmptyInputValue(control.value)) {
             return null; // don't validate empty values to allow optional controls
         }
-        return EMAIL_REGEXP.test($control.val()) ? null : { 'email': true };
+        return EMAIL_REGEXP.test(control.value) ? null : { 'email': true };
     }
     /**
      * \@description
@@ -251,15 +262,15 @@ export class Validators {
      */
     static minLength(minLength) {
         return (/**
-         * @param {?} $control
+         * @param {?} control
          * @return {?}
          */
-        ($control) => {
-            if (isEmptyInputValue($control.val())) {
+        (control: AbstractControl) => {
+            if (isEmptyInputValue(control.value)) {
                 return null; // don't validate empty values to allow optional controls
             }
             /** @type {?} */
-            const length = $control.val() ? $control.val().length : 0;
+            const length = control.value ? control.value.length : 0;
             return length < minLength ?
                 { 'minlength': { 'requiredLength': minLength, 'actualLength': length } } :
                 null;
@@ -294,12 +305,12 @@ export class Validators {
      */
     static maxLength(maxLength) {
         return (/**
-         * @param {?} $control
+         * @param {?} control
          * @return {?}
          */
-        ($control) => {
+        (control: AbstractControl) => {
             /** @type {?} */
-            const length = $control.val() ? $control.val().length : 0;
+            const length = control.value ? control.value.length : 0;
             return length > maxLength ?
                 { 'maxlength': { 'requiredLength': maxLength, 'actualLength': length } } :
                 null;
@@ -356,15 +367,15 @@ export class Validators {
             regex = pattern;
         }
         return (/**
-         * @param {?} $control
+         * @param {?} control
          * @return {?}
          */
-        ($control) => {
-            if (isEmptyInputValue($control.val())) {
+        (control: AbstractControl) => {
+            if (isEmptyInputValue(control.value)) {
                 return null; // don't validate empty values to allow optional controls
             }
             /** @type {?} */
-            const value = $control.val();
+            const value = control.value;
             return regex.test(value) ? null :
                 { 'pattern': { 'requiredPattern': regexStr, 'actualValue': value } };
         });
