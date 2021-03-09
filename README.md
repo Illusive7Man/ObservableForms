@@ -25,18 +25,18 @@ more direct, explicit access to elements' functionalities is provided through ob
 ## Functionality
 A `FormControl` represents a single form element, e.g. a single text input, or a set of radio inputs with the same name,
 and a `FormGroup` represents a collection of those controls, e.g. a form.<br/>
-These objects have properties describing the elements they reference, such as:
+Some of the properties representing the referenced element(s) are:
 - value
 - touched&emsp;- _has the user interacted with the element(s) at all_
 - dirty&emsp;&emsp;&nbsp; - _has the user changed element(s) value_
 - valid
 - disabled
 
-along with the methods to change these properties, and observable streams, `valueChanges` and `statusChanges`,
+Also, methods to change these properties are provided, along with the observable streams, such as `valueChanges` and `statusChanges`
 that track the value and status (valid, invalid or disabled) of the element(s).<br/>
 These properties and methods were designed to replace the usual handling of events and changing of attributes 
 when working with a form, and make the implementation of form validation
-and custom form behavior as straightforward as possible.
+and custom form logic as straightforward as possible.
 
 <a name="usage"/>
 
@@ -93,8 +93,7 @@ form.controls.addresses[0].city.valueChanges.subscribe(_ => '...');
 console.log(form.value.isSubscriber);
 ```
 
-Descriptions of properties and methods of FormControl class are listed in [this file](./lib/formControl.d.ts),
-and [this file](./lib/formGroup.d.ts) has descriptions for FormGroup.
+Descriptions of properties and methods of FormControl and FormGroup can be found at the [codesandbox link](https://codesandbox.io/s/declarations-gqjol).
 
 
 _Important note: Type checking is available in both JavaScript and TypeScript projects._
@@ -118,14 +117,14 @@ Styling will be configurable in the future versions._<br/>
  
 ### Demo 1 - "A standard form"
 A JavaScript project covering a lot of library's functionalities, and shows how to integrate type checking into JavaScript code.<br/>
-https://b1h75.csb.app/
+[Demo 1](https://b1h75.csb.app/)
 
-_Note: that CodeSandbox has same built-in js bundler that allows non-standard imports in .js files.
+_Note: that CodeSandbox has some built-in js bundler that allows non-standard imports in .js files.
 Below those imports are comments on how they should be used plain .js files._<br/>
 <br/>
 ### Demo 2 - "Custom made"
 A TypeScript project covering custom form controls. Also demonstrates support for Web Components.<br/>
-https://dxrdg.csb.app/
+[Demo2](https://dxrdg.csb.app/)
 
 
 <a name="installation"/>
