@@ -41,6 +41,8 @@ and custom form logic as straightforward as possible.
 <a name="usage"/>
 
 ## Usage
+
+### Form Control
 Creating and using a form control is pretty simple:
 
 ```typescript
@@ -65,7 +67,9 @@ isPaymentDifferentFromDelivery$.pipe(switchMap(isDifferent => isDifferent
     : deliveryAddress.valueChanges.pipe(value => paymentAddress.setValue(value))
 )).subscribe();
 ```
-<br/><br/>
+<br/>
+
+### Form Group
 Form group aggregates controls found in the subtree of the selected element(s) into one object,
 with each control's name as the key. Name is either control's `name` attribute or one manually provided.<br/>
 Class of this object accepts a type parameter representing the model of the form group,
