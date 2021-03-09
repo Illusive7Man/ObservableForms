@@ -97,7 +97,7 @@ form.controls.addresses[0].city.valueChanges.subscribe(_ => '...');
 console.log(form.value.isSubscriber);
 ```
 
-Descriptions of properties and methods of FormControl and FormGroup can be found at the [codesandbox link](https://codesandbox.io/s/declarations-gqjol).
+Descriptions of properties and methods of FormControl and FormGroup can be found at the following [codesandbox link](https://codesandbox.io/s/declarations-gqjol).
 
 
 _Important note: Type checking is available in both JavaScript and TypeScript projects._
@@ -128,7 +128,7 @@ Below those imports are comments on how they should be used plain .js files._<br
 <br/>
 ### Demo 2 - "Custom made"
 A TypeScript project covering custom form controls. Also demonstrates support for Web Components.<br/>
-[Demo2](https://dxrdg.csb.app/)
+[Demo 2](https://dxrdg.csb.app/)
 
 
 <a name="installation"/>
