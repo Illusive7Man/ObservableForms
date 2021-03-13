@@ -14,11 +14,11 @@
   ],
   "dependencies": {
     "@popperjs/core": "^2.5.3",
-    "@types/resize-observer-browser": "^0.1.4",
     "rxjs": "6.x"
   },
   "devDependencies": {
     "@types/jquery": "^3.5.5",
+    "@types/resize-observer-browser": "^0.1.4",
     "chokidar": "^3.5.1",
     "esbuild": "^0.8.32",
     "tslib": "^2.0.1",
