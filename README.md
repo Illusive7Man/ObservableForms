@@ -8,7 +8,7 @@ Inspired by Angular's forms.
 
 With this library, you can create an interactive representation of your html form,
 whose API is based on reactive patterns.<br/>
-Instead of manually selecting and attaching the JavaScript code to form's elements,
+Instead of manually selecting and attaching JavaScript code to form's elements,
 more direct, explicit access to elements' functionalities is provided through objects called `FormControl` and `FormGroup`.<br/>
 
 ##### Prerequisites:
@@ -25,14 +25,14 @@ more direct, explicit access to elements' functionalities is provided through ob
 ## Functionality
 A `FormControl` represents a single form element, e.g. a single text input, or a set of radio inputs with the same name,
 and a `FormGroup` represents a collection of those controls, e.g. a form.<br/>
-Some of the properties representing the referenced element(s) are:
+Some of the properties of these objects are:
 - value
 - touched&emsp;- _has the user interacted with the element(s) at all_
 - dirty&emsp;&emsp;&nbsp; - _has the user changed element(s) value_
 - valid
 - disabled
 
-Also, methods to change these properties are provided, along with the observable streams, such as `valueChanges` and `statusChanges`
+Also, methods to change these properties are provided, along with the observable streams (`valueChanges` and `statusChanges`)
 that track the value and status (valid, invalid or disabled) of the element(s).<br/>
 These properties and methods were designed to replace the usual handling of events and changing of attributes 
 when working with a form, and make the implementation of form validation
@@ -59,12 +59,11 @@ let deliveryAddress = $('#delivery-address').asFormControl();
 let paymentAddress = $('#payment-address').asFormControl().enableValidation();
 
 let isPaymentDifferentFromDelivery$ = $('#different-checkbox').asFormControl().valueChanges
-    .pipe(map(value => value.toLowerCase() === 'true'), startWith('false'));
+    .pipe(map(value => value === 'true'), startWith(false));
 
 isPaymentDifferentFromDelivery$.pipe(switchMap(isDifferent => isDifferent
-    ? paymentAddress.statusChanges.pipe(tap(status => 
-        status === FormControlStatus.INVALID ? alert('Entered address is not valid') : null))
-    : deliveryAddress.valueChanges.pipe(value => paymentAddress.setValue(value))
+    ? paymentAddress.statusChanges.pipe(tap(status => status === FormControlStatus.INVALID && alert('Entered address is not valid')))
+    : deliveryAddress.valueChanges.pipe(tap(value => paymentAddress.setValue(value)))
 )).subscribe();
 ```
 <br/>
@@ -72,16 +71,19 @@ isPaymentDifferentFromDelivery$.pipe(switchMap(isDifferent => isDifferent
 ### Form Group
 Form group aggregates controls found in the subtree of the selected element(s) into one object,
 with each control's name as the key. Name is either control's `name` attribute or one manually provided.<br/>
-Class of this object accepts a type parameter representing the model of the form group,
-which provides type checking when working with the controls.<br/><br/>
+Class of this object accepts a **type parameter** representing the model of the form group,
+which provides type checking when working with the controls and values.<br/>
+Type checking is also available in plain JavaScript no-build projects, as demonstrated in the [Demos](#demos).<br/><br/>
 _Author's note: The best way to have full stack type checking is to find a tool
-that will generate TypeScript versions of your backend classes, and use those as type parameters of form groups._
+that will generate TypeScript versions of your backend classes, and use those as type parameters of form groups.
+Here's the one I use for .NET MVC, [link](https://www.nuget.org/packages/TypeScriptBuilder)._
 
 
 Some features of the FormGroup objects are:
-- The value is a JSON object of selected controls and their values.
+- The value is a JSON object of controls' names and values.
 - Its validity is affected by the validity of the controls.
 - Controls can be added and removed from the group.
+- Validation
 
 ```typescript
 class MyForm {
@@ -96,17 +98,17 @@ form.controls.fullName.valueChanges.subscribe(_ => '...')
 form.controls.addresses[0].city.valueChanges.subscribe(_ => '...');
 console.log(form.value.isSubscriber);
 ```
+<br/>
 
-Descriptions of properties and methods of FormControl and FormGroup can be found at the following [codesandbox link](https://codesandbox.io/s/declarations-gqjol).
-
-
-_Important note: Type checking is available in both JavaScript and TypeScript projects._
+Despite some inconsistencies, Angular docs can be used as more detailed API reference: 
+[AbstractControl](https://angular.io/api/forms/AbstractControl), [FormControl](https://angular.io/api/forms/FormControl),
+[FormGroup](https://angular.io/api/forms/FormGroup).
 
 
 <a name="demos"/>
 
 ## Demos
-These demos will try to cover as many possible scenarios as possible, such as:
+These demos will try to cover as many scenarios as possible, such as:
 - changing element's types
 - disabling/enabling form controls
 - removing controls from the DOM
@@ -130,6 +132,10 @@ Below those imports are comments on how they should be used plain .js files._<br
 A TypeScript project covering custom form controls. Also demonstrates support for Web Components.<br/>
 [Demo 2](https://dxrdg.csb.app/)
 
+
+### Demo 3 - "Form update"
+A JavaScript project showing how to change form's data and how to reset it.<br/>
+[Demo 3](https://rysti.csb.app/)
 
 <a name="installation"/>
 

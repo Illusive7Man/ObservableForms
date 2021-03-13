@@ -175,6 +175,8 @@ export class FormGroup<TControls = any> extends AbstractControl {
         this.disabledSubject.next(false);
     }
 
+    public readonly valueChanges!: Observable<TControls>;
+
     /**
      * Sets the value of the `FormGroup`. It accepts an object that matches
      * the structure of the group, with control names as keys.
@@ -364,6 +366,10 @@ export class FormGroup<TControls = any> extends AbstractControl {
         this.subscriptions.add(s1).add(s2).add(s3);
     }
 
+    valueMap(mapFn: (value: TControls) => any): this {
+        return super.valueMap(mapFn);
+    }
+
     /**
      * Starts tracking validity of the field(s) and creates notifications in the UI.
      */
@@ -479,9 +485,10 @@ export class FormGroup<TControls = any> extends AbstractControl {
         let unindexedArray = this.unindexedArray;
 
         let existingControl = unindexedArray.find(({name: controlName, }) => controlName === name);
-        if (existingControl)
+        if (existingControl) {
+            console.warn('Control is already in the group. Use setControl() to change it.');
             return this;
-
+        }
         unindexedArray.push({name: name as string, control});
 
         this.controls = convertArrayToJson(unindexedArray.map(({name, control}) => ({name, value: control})));
@@ -528,8 +535,10 @@ export class FormGroup<TControls = any> extends AbstractControl {
         let unindexedArray = this.unindexedArray;
 
         let existingControl = unindexedArray.find(({name: controlName, }) => controlName === name);
-        if (existingControl == null)
+        if (existingControl == null) {
+            console.error('Can\'t set the control if it\'s not in the group. Use addControl() to add it.');
             return this;
+        }
 
         unindexedArray.splice(unindexedArray.indexOf(existingControl), 1);
         unindexedArray.push({name: name as string, control});
