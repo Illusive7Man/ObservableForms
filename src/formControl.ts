@@ -46,7 +46,7 @@ export class FormControl<TValue = any> extends AbstractControl {
      *
      * @param value The new value for the control.
      */
-    setValue(value: any): void {
+    setValue(value: TValue): void {
         let $control = this.toJQuery();
 
         let isCheckbox = checkIfCheckboxControl($control);
@@ -56,11 +56,11 @@ export class FormControl<TValue = any> extends AbstractControl {
             let shouldBeChecked = $control.filter('[type=checkbox]').val() === value.toString();
             $control.filter('[type=checkbox]').prop('checked', shouldBeChecked);
         } else if (isRadio) {
-            value !== '' && value != null
+            value as any !== '' && value != null
                 ? $control.filter('[value="' + value + '"]').prop('checked', true)
                 : $control.prop('checked', false);
         } else
-            ($control[0] as FormControlType).value = value;
+            ($control[0] as FormControlType).value = value as any;
 
         this.valueChangesSubject.next(getFormControlValue(this.toJQuery() as JQuery<FormControlType>) as any);
     }
@@ -74,7 +74,7 @@ export class FormControl<TValue = any> extends AbstractControl {
      *
      * @see `setValue` for options
      */
-    patchValue(value: any): void {
+    patchValue(value: TValue): void {
         this.setValue(value);
     }
 
@@ -86,7 +86,7 @@ export class FormControl<TValue = any> extends AbstractControl {
         this.markAsUntouched();
         this.markAsPristine();
 
-        this.setValue('');
+        this.setValue('' as any);
     }
 
     protected setupObservables(valueChangesUI?: Observable<any>,
@@ -117,6 +117,10 @@ export class FormControl<TValue = any> extends AbstractControl {
         let s3 = dirtyUI$.subscribe(_ => this.markAsDirty());
 
         this.subscriptions.add(s1).add(s2).add(s3);
+    }
+
+    valueMap(mapFn: (value: TValue) => any): this {
+        return super.valueMap(mapFn);
     }
 
     /**
