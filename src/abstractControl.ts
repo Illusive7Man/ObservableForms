@@ -193,7 +193,7 @@ export abstract class AbstractControl {
     protected manualValidityUpdateSubject: Subject<void>;
     protected _existingValidationSubscription: Subscription;
 
-    validityPopper: Instance;
+    validityPopper: Instance & {setReference: (reference: HTMLElement) => void};
     /**
      * Indicates whether validation errors are currently shown to the user.
      *
