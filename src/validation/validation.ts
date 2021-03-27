@@ -45,11 +45,21 @@ export function attachPopper(abstractControl: AbstractControl): void {
         return originalSetOptions(options);
     }
 
+    // Catch manual setting of reference
+    let usesManualReference = false;
+    Object.defineProperty(abstractControl.validityPopper, 'setReference', {
+        value: function (reference: HTMLElement) {
+            usesManualReference = true;
+            abstractControl.validityPopper.state.elements.reference = reference;
+            abstractControl.validityPopper.update();
+        }
+    })
+
     let controlsArray$ = abstractControl instanceof FormGroup ? abstractControl.controlsArray$ : of([abstractControl]);
 
     // Control the placement and handle DOM visibility
     let reference$ = controlsArray$.pipe(
-        filter(controls => controls.length > 0),
+        filter(_ => !usesManualReference),
         map(_ => determinePopperPositioning(abstractControl).$reference), shareReplay(1));
 
     // Setup reference element

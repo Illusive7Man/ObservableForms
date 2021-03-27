@@ -26,9 +26,9 @@ export class FormControl<TValue = any> extends AbstractControl {
         if (cachedElement)
             return cachedElement as FormControl<TValue>;
 
-        // Handle empty controls $().asFormControl(), or if nothing's selected
-        // if (jQueryObject.length === 0)
-        //     throw 'Form controls have to be based on existing DOM elements. The selector used has returned no elements.'
+        // No empty controls without valueChangesUI provided
+        if (jQueryObject.length === 0 && valueChangesUI == null)
+            throw 'Empty controls must have valueChanges provided.'
 
         jQueryObject.each((_, element) => element.setAttribute('formControl', '')); // radio / checkbox controls have multiple elements.
 

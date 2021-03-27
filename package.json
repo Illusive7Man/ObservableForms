@@ -13,12 +13,12 @@
     "lib/*"
   ],
   "dependencies": {
+    "@types/resize-observer-browser": "^0.1.4",
     "@popperjs/core": "^2.5.3",
     "rxjs": "6.x"
   },
   "devDependencies": {
     "@types/jquery": "^3.5.5",
-    "@types/resize-observer-browser": "^0.1.4",
     "chokidar": "^3.5.1",
     "esbuild": "^0.8.32",
     "tslib": "^2.0.1",
@@ -47,5 +47,5 @@
   },
   "type": "module",
   "types": "dist/index.d.ts",
-  "version": "1.0.2"
+  "version": "1.0.4"
 }
