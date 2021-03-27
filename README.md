@@ -43,6 +43,9 @@ and custom form logic as straightforward as possible.
 ## Usage
 
 ### Form Control
+This is one of the two fundamental building blocks of Observable forms, along with
+`FormGroup`. It tracks the value and validation status of an individual form control.
+
 Creating and using a form control is pretty simple:
 
 ```typescript
@@ -81,7 +84,6 @@ Here's the one I use for .NET MVC, [link](https://www.nuget.org/packages/TypeScr
 
 Some features of the FormGroup objects are:
 - The value is a JSON object of controls' names and values.
-- Its validity is affected by the validity of the controls.
 - Controls can be added and removed from the group.
 - Validation
 
@@ -92,8 +94,10 @@ class MyForm {
     addresses: {street: string; city: string}[];
 }
 
-// Type checking !!
+// Create a form (TS version)
 let form = $('form').asFormGroup<MyForm>();
+
+// Accessing child controls and value, with editor providing type information
 form.controls.fullName.valueChanges.subscribe(_ => '...')
 form.controls.addresses[0].city.valueChanges.subscribe(_ => '...');
 console.log(form.value.isSubscriber);
@@ -109,24 +113,25 @@ Despite some inconsistencies, Angular docs can be used as more detailed API refe
 
 ## Demos
 These demos will try to cover as many scenarios as possible, such as:
-- changing element's types
 - disabling/enabling form controls
-- removing controls from the DOM
-- adding new controls to the DOM
+- adding / removing controls from the DOM
+- changing element's types
+- creating controls from non-input elements
 - handling [Web Components](https://developer.mozilla.org/en-US/docs/Web/Web_Components)
 - changing form's data / resetting
 - handling arrays
 
 _Note: These demos are hosted on codesandbox, and code behind the forms can be accessed using the "Open Sandbox" button.
 Fullscreen view is preferable, considering the style of validation messages.
-Styling will be configurable in the future versions._<br/>
+Styling will be configurable in the future versions,
+but for now, it can be turned off, so a custom implementation can be used._<br/>
  
 ### Demo 1 - "A standard form"
-A JavaScript project covering a lot of library's functionalities, and shows how to integrate type checking into JavaScript code.<br/>
+A JavaScript project covering a lot of library's functionalities, and showing how to integrate type checking into JavaScript code.<br/>
 [Demo 1](https://b1h75.csb.app/)
 
 _Note: that CodeSandbox has some built-in js bundler that allows non-standard imports in .js files.
-Below those imports are comments on how they should be used plain .js files._<br/>
+Below those imports are comments on how they should be used plain .js files._
 <br/>
 ### Demo 2 - "Custom made"
 A TypeScript project covering custom form controls. Also demonstrates support for Web Components.<br/>
@@ -148,7 +153,7 @@ Inside a html script tag, or in javascript:
 import {} from "./node_modules/observable-forms/dist/index.js";
 // Library self initializes when module is loaded.
 
-let $formControl = $('input').valueChanges.subscribe(val => console.log(val));
+let $formControl = $('input').asFormControl().valueChanges.subscribe(val => console.log(val));
 ...
 </script>
 ```
@@ -157,6 +162,7 @@ or, in Typescript:
 ```javascript
 import {ConfigService, Validators} from "observable-forms";
 
+// Declaratively adding validation to controls using html attributes
 ConfigService.registerAttributeValidators({
     'data-val-required': Validators.required,
     'data-val-email': Validators.email,

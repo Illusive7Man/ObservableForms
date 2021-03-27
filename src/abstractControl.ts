@@ -18,10 +18,7 @@ import {validationEnabled} from "./common/decorators";
 export abstract class AbstractControl {
 
     /**
-     * Synchronous validators as they were provided:
-     *  - in `AbstractControl` constructor
-     *  - as an argument while calling `setValidators` function
-     *  - while calling the setter on the `validator` field (e.g. `control.validator = validatorFn`)
+     * Synchronous validators as they were provided as an argument while calling `setValidators` function.
      */
     protected validators: ValidatorFn[];
 
@@ -64,7 +61,6 @@ export abstract class AbstractControl {
      *
      * * **VALID**: This control has passed all validation checks.
      * * **INVALID**: This control has failed at least one validation check.
-     * * **PENDING**: This control is in the midst of conducting a validation check.
      * * **DISABLED**: This control is exempt from validation checks.
      *
      * These status values are mutually exclusive, so a control cannot be
@@ -101,7 +97,7 @@ export abstract class AbstractControl {
      *
      * Disabled controls are exempt from validation checks and
      * are not included in the aggregate value of their ancestor
-     * controls.
+     * groups.
      *
      * @see {@link AbstractControl.status}
      *
@@ -208,12 +204,13 @@ export abstract class AbstractControl {
     }
 
     /**
-     * Sets the synchronous validators that are active on this control.  Calling
-     * this overwrites any existing sync validators.
+     * Sets the synchronous validators that are active on this control.
+     * Calling this overwrites any existing sync validators.
      */
-    setValidators(newValidators: ValidatorFn[]): void {
+    setValidators(newValidators: ValidatorFn[]): this {
         this.validators = newValidators;
         this.updateValidity();
+        return this;
     }
 
     /**
@@ -237,16 +234,10 @@ export abstract class AbstractControl {
         this.touchedSubject.next(true);
     }
 
-
-    markAllAsTouched(): void {
-        this.markAsTouched();
-    }
-
     /**
      * Marks the control as `untouched`.
      *
-     * If the control has any children, also marks all children as `untouched`
-     * and recalculates the `touched` status of all parent controls.
+     * In a group, marks all children as `untouched`.
      *
      * @see `markAsTouched()`
      * @see `markAsDirty()`
@@ -271,19 +262,9 @@ export abstract class AbstractControl {
     }
 
     /**
-     * Marks the control and all its descendant controls as `dirty`.
-     * @see `markAsTouched()`
-     */
-        markAllAsDirty(): void {
-        this.markAsDirty();
-    }
-
-    /**
      * Marks the control as `pristine`.
      *
-     * If the control has any children, marks all children as `pristine`,
-     * and recalculates the `pristine` status of all parent
-     * controls.
+     * In a group, marks all children as `pristine`.
      *
      * @see `markAsTouched()`
      * @see `markAsUntouched()`
@@ -299,7 +280,7 @@ export abstract class AbstractControl {
      * Disables the control. This means the control is exempt from validation checks and
      * excluded from the aggregate value of any parent. Its status is `DISABLED`.
      *
-     * If the control has children, all children are also disabled.
+     * In a group, all children are also disabled.
      *
      * @see {@link AbstractControl.status}
      */
@@ -313,7 +294,7 @@ export abstract class AbstractControl {
      * the aggregate value of its parent. Its status recalculates based on its value and
      * its validators.
      *
-     * By default, if the control has children, all children are enabled.
+     * In a group, all children are enabled.
      *
      * @see {@link AbstractControl.status}
      */
@@ -374,7 +355,7 @@ export abstract class AbstractControl {
     /**
      * Recalculates the validation status of the control.
      *
-     * By default, it also updates the value and validity of its ancestors.
+     * It also updates the value and validity of its ancestors.
      */
     @validationEnabled
     updateValidity(): void {

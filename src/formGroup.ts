@@ -11,23 +11,18 @@ import {ControlTree, ControlTreePath, DeepPartial, FormControlStatus, FormContro
 /**
  * Tracks the value and validity state of a group of `FormControl` instances.
  *
- * A `FormGroup` aggregates the values of each child `FormControl` into one object,
- * with each control name as the key.  It calculates its status by reducing the status values
- * of its children. For example, if one of the controls in a group is invalid, the entire
- * group becomes invalid.
+ * Form group aggregates controls found in the subtree of the selected element(s) into one object,
+ * with each control's name as the key. Name is either control's name attribute or one manually provided.
  *
- * When instantiating a `FormGroup`, pass in a collection of child controls as the first
- * argument. The key for each child registers the name for the control.
+ * Class of this object accepts a type parameter representing the model of the form group,
+ * which provides type checking when working with the controls and values.
  *
  * @usageNotes
  *
  * ### Create a form group with 2 controls
  *
  * ```
- * const form = new FormGroup({
- *   first: new FormControl('Nancy', Validators.minLength(2)),
- *   last: new FormControl('Drew'),
- * });
+ * let form = $('form').asFormGroup<{first: string; last: string;}>();
  *
  * console.log(form.value);   // {first: 'Nancy', last; 'Drew'}
  * console.log(form.status);  // 'VALID'
@@ -35,44 +30,19 @@ import {ControlTree, ControlTreePath, DeepPartial, FormControlStatus, FormContro
  *
  * ### Create a form group with a group-level validator
  *
- * You include group-level validators as the second arg, or group-level async
- * validators as the third arg. These come in handy when you want to perform validation
+ * You define group-level validators using the setValidators method.
+ * These come in handy when you want to perform validation
  * that considers the value of more than one child control.
  *
  * ```
- * const form = new FormGroup({
- *   password: new FormControl('', Validators.minLength(2)),
- *   passwordConfirm: new FormControl('', Validators.minLength(2)),
- * }, passwordMatchValidator);
+ * let form = $('#passwords input').asFormGroup<{password: string; passwordConfirm: string}>()
+ *      .setValidators([passwordMatchValidator]);
  *
  *
  * function passwordMatchValidator(g: FormGroup) {
- *    return g.get('password').value === g.get('passwordConfirm').value
+ *    return g.controls.password.value === g.controls.passwordConfirm.value
  *       ? null : {'mismatch': true};
  * }
- * ```
- *
- * Like `FormControl` instances, you choose to pass in
- * validators and async validators as part of an options object.
- *
- * ```
- * const form = new FormGroup({
- *   password: new FormControl('')
- *   passwordConfirm: new FormControl('')
- * }, { validators: passwordMatchValidator, asyncValidators: otherValidator });
- * ```
- *
- * ### Set the updateOn property for all controls in a form group
- *
- * The options object is used to set a default value for each child
- * control's `updateOn` property. If you set `updateOn` to `'blur'` at the
- * group level, all child controls default to 'blur', unless the child
- * has explicitly specified a different `updateOn` value.
- *
- * ```ts
- * const c = new FormGroup({
- *   one: new FormControl()
- * }, { updateOn: 'blur' });
  * ```
  *
  * @publicApi
@@ -82,7 +52,10 @@ export class FormGroup<TControls = any> extends AbstractControl {
     public readonly value: TControls;
 
     /**
-     * List of selected elements. Useful when selector has multiple results.
+     * A collection of child controls. The key for each child is the name
+     * under which it is registered.
+     * By default, the name attribute of the html element is used,
+     * but a custom name can be  provided when using `addControl`.
      */
     controls: ControlTree<TControls>;
 
@@ -133,8 +106,12 @@ export class FormGroup<TControls = any> extends AbstractControl {
         this.subscriptions.add(s1);
     }
 
+    /**
+     * Marks the group and all its child controls as `touched`.
+     * @see `markAsTouched()`
+     */
     markAllAsTouched(): void {
-        super.markAllAsTouched();
+        this.markAsTouched();
 
         this.controlsArray.forEach(control => control.markAsTouched());
     }
@@ -145,8 +122,12 @@ export class FormGroup<TControls = any> extends AbstractControl {
         this.controlsArray.forEach(control => control.markAsUntouched());
     }
 
+    /**
+     * Marks the group and all its child controls as `dirty`.
+     * @see `markAsTouched()`
+     */
     markAllAsDirty(): void {
-        super.markAllAsDirty();
+        this.markAsDirty();
 
         this.controlsArray.forEach(control => control.markAsDirty());
     }
@@ -436,9 +417,10 @@ export class FormGroup<TControls = any> extends AbstractControl {
      * Sets the synchronous validators that are active on this control.  Calling
      * this overwrites any existing sync validators.
      */
-    setValidators(newValidators: ValidatorFn<FormGroup<TControls>>[]): void {
+    setValidators(newValidators: ValidatorFn<FormGroup<TControls>>[]): this {
         this.validators = newValidators;
         this.updateValidity();
+        return this;
     }
 
     /**
