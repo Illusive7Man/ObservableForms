@@ -7,6 +7,38 @@ import {FormGroup} from "./formGroup";
 import {attachPopper, setValidationRulesFromAttributes} from "./validation/validation";
 import {FormControlStatus, FormControlType, ValidationErrors} from "./common/types";
 
+/**
+ * Tracks the value and validation status of an individual form control.
+ *
+ * This is one of the two fundamental building blocks of Observable forms, along with
+ * `FormGroup`. It extends the `AbstractControl` class that
+ * implements most of the base functionality for accessing the value, validation status,
+ * user interactions and events. See [usage examples below](#usage-notes).
+ *
+ * @see `AbstractControl`
+ * @see [Usage Notes](#usage-notes)
+ *
+ * @usageNotes
+ *
+ * ### Initializing Form Controls
+ *
+ * Instantiate a `FormControl`.
+ *
+ * ```ts
+ * let control = $('#my-input').asFormControl();
+ * console.log(control.value);     // '<value of the input>'
+ *```
+ *
+ * The following example initializes the control with a validator.
+ *
+ * ```ts
+ * let control = $('#my-input').asFormControl().setValidators([Validators.required]);
+ * console.log(control.value);      // ''
+ * console.log(control.status);     // 'INVALID'
+ * ```
+ *
+ * @publicApi
+ */
 export class FormControl<TValue = any> extends AbstractControl {
 
     value: TValue;
