@@ -1,66 +1,54 @@
-# Observable Forms plug-in for jQuery [![npm version](https://badge.fury.io/js/observable-forms.svg)](http://badge.fury.io/js/observable-forms)
-Inspired by Angular's forms.
-<br/>
-<br/>
+<div><img align="left" src="https://i.imgur.com/41C5GKI.png" alt="Observable logo" width="200"/>
 
 
+# Observable Forms (for jQuery) [![npm version](https://badge.fury.io/js/observable-forms.svg)](http://badge.fury.io/js/observable-forms)
+Inspired by Angular forms.
+</div>
+<br/><br/><br/><br/>
 
-
-With this library, you can create an interactive representation of your html form,
+With this library, you can effortlessly create an interactive representation of your html form,
 whose API is based on reactive patterns.<br/>
 Instead of manually selecting and attaching JavaScript code to form's elements,
-more direct, explicit access to elements' functionalities is provided through objects called `FormControl` and `FormGroup`.<br/>
-
+a more direct, explicit, access to elements' functionalities is provided through objects called `FormControl` and `FormGroup`.<br/>
+This library, using observables and static type checking, offers a modern workflow for all types of projects,
+without even requiring a build process (TypeScript or bundlers). It can be used with server rendered templates (.NET MVC, PHP, Django, etc.),
+and with SPAs.
 ##### Prerequisites:
-- Basic knowledge of RxJS is desirable.<br/>
+- Basic knowledge of RxJS.<br/>
 
 ##### Table of Contents
-[Functionality](#functionality)<br/>
-[Usage](#usage)<br/>
-[Demos](#demos)<br/>
-[Installation](#installation)<br/>
+- [Functionality & Usage](#functionality)<br/>
+- [Demos](#demos)<br/>
+- [Installation](#installation)<br/>
 
 <a name="functionality"/>
 
-## Functionality
-A `FormControl` represents a single form element, e.g. a single text input, or a set of radio inputs with the same name,
-and a `FormGroup` represents a collection of those controls, e.g. a form.<br/>
-Some of the properties of these objects are:
-- value
-- touched&emsp;- _has the user interacted with the element(s) at all_
-- dirty&emsp;&emsp;&nbsp; - _has the user changed element(s) value_
-- valid
-- disabled
-
-Also, methods to change these properties are provided, along with the observable streams (`valueChanges` and `statusChanges`)
-that track the value and status (valid, invalid or disabled) of the element(s).<br/>
-These properties and methods were designed to replace the usual handling of events and changing of attributes 
-when working with a form, and make the implementation of form validation
-and custom form logic as straightforward as possible.
-
-<a name="usage"/>
-
-## Usage
+## Functionality & Usage
 
 ### Form Control
-This is one of the two fundamental building blocks of Observable forms, along with
-`FormGroup`. It tracks the value and validation status of an individual form control.
+This is one of the two fundamental building blocks of Observable Forms, along with
+`FormGroup`. It tracks the value and validation status of an individual form control
+(a single text input, a set of radio inputs with the same name, etc.).
 
 Creating and using a form control is pretty simple:
 
 ```typescript
+// Module imports
 import {switchMap, tap} from "rxjs/operators";
 import {FormControlStatus} from "./types";
 
+// FormControl created
 let firstName = $('#firstName').asFormControl().enableValidation();
 firstName.valueChanges.subscribe(value => console.log('My new value is: ' + value));
 
-// ...
-// Let's try something a bit more complicated
+// ... let's try something a bit more complicated
+// Either copy the delivery address into payment address field,
+// or track payment address status, and alert the user if invalid (validation logic not shown)
 
 let deliveryAddress = $('#delivery-address').asFormControl();
 let paymentAddress = $('#payment-address').asFormControl().enableValidation();
 
+// Observable<boolean>
 let isPaymentDifferentFromDelivery$ = $('#different-checkbox').asFormControl().valueChanges
     .pipe(map(value => value === 'true'), startWith(false));
 
@@ -68,6 +56,8 @@ isPaymentDifferentFromDelivery$.pipe(switchMap(isDifferent => isDifferent
     ? paymentAddress.statusChanges.pipe(tap(status => status === FormControlStatus.INVALID && alert('Entered address is not valid')))
     : deliveryAddress.valueChanges.pipe(tap(value => paymentAddress.setValue(value)))
 )).subscribe();
+
+// Code ends up being more concise and cleaner (no removeEventListener())
 ```
 <br/>
 
@@ -75,17 +65,20 @@ isPaymentDifferentFromDelivery$.pipe(switchMap(isDifferent => isDifferent
 Form group aggregates controls found in the subtree of the selected element(s) into one object,
 with each control's name as the key. Name is either control's `name` attribute or one manually provided.<br/>
 Class of this object accepts a **type parameter** representing the model of the form group,
-which provides type checking when working with the controls and values.<br/>
-Type checking is also available in plain JavaScript no-build projects, as demonstrated in the [Demos](#demos).<br/><br/>
-_Author's note: The best way to have full stack type checking is to find a tool
+which provides static type checking when working with the controls and values.<br/>
+<ins>Type checking is also available in plain JavaScript no-build projects, as demonstrated in the Demos.</ins><br/><br/>
+_Author's note: The best and easiest way to have type checking is to find a tool
 that will generate TypeScript versions of your backend classes, and use those as type parameters of form groups.
 Here's the one I use for .NET MVC, [link](https://www.nuget.org/packages/TypeScriptBuilder)._
 
 
 Some features of the FormGroup objects are:
-- The value is a JSON object of controls' names and values.
+- The value is a JSON object of child controls' names and values.
 - Controls can be added and removed from the group.
 - Validation
+- Custom controls as child controls
+- Web Components support
+
 
 ```typescript
 class MyForm {
@@ -94,7 +87,7 @@ class MyForm {
     addresses: {street: string; city: string}[];
 }
 
-// Create a form (TS version)
+// Create a form group (TS version)
 let form = $('form').asFormGroup<MyForm>();
 
 // Accessing child controls and value, with editor providing type information
@@ -102,9 +95,20 @@ form.controls.fullName.valueChanges.subscribe(_ => '...')
 form.controls.addresses[0].city.valueChanges.subscribe(_ => '...');
 console.log(form.value.isSubscriber);
 ```
-<br/>
+<img src="https://i.imgur.com/P1wCcPU.png" alt="Autocomplete in action" width="100%"/>
+<div align="center">Autocomplete in action</div>
+<br/><br/>
 
-Despite some inconsistencies, Angular docs can be used as more detailed API reference: 
+Some of the properties, observables and methods of `FormControl` and `FormGroup` are:
+- value, valueChanges&nbsp;&emsp; - _string or JSON_
+- status, statusChanges&emsp;- _valid, invalid or disabled_
+- touched&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;- _has the user interacted with the element(s) at all_
+- dirty&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&nbsp; - _has the user changed element(s) value_
+- setValue()
+- reset()
+
+
+Despite some inconsistencies, Angular docs can be used as more detailed API reference:
 [AbstractControl](https://angular.io/api/forms/AbstractControl), [FormControl](https://angular.io/api/forms/FormControl),
 [FormGroup](https://angular.io/api/forms/FormGroup).
 
@@ -113,7 +117,7 @@ Despite some inconsistencies, Angular docs can be used as more detailed API refe
 
 ## Demos
 These demos will try to cover as many scenarios as possible, such as:
-- disabling/enabling form controls
+- disabling / enabling form controls
 - adding / removing controls from the DOM
 - changing element's types
 - creating controls from non-input elements
@@ -125,7 +129,7 @@ _Note: These demos are hosted on codesandbox, and code behind the forms can be a
 Fullscreen view is preferable, considering the style of validation messages.
 Styling will be configurable in the future versions,
 but for now, it can be turned off, so a custom implementation can be used._<br/>
- 
+
 ### Demo 1 - "A standard form"
 A JavaScript project covering a lot of library's functionalities, and showing how to integrate type checking into JavaScript code.<br/>
 [Demo 1](https://b1h75.csb.app/)
@@ -150,11 +154,11 @@ A JavaScript project showing how to change form's data and how to reset it.<br/>
 Inside a html script tag, or in javascript:
 ```html
 <script type="module">
-import {} from "./node_modules/observable-forms/dist/index.js";
-// Library self initializes when module is loaded.
+    import {} from "./node_modules/observable-forms/dist/index.js";
+    // Library self initializes when module is loaded.
 
-let $formControl = $('input').asFormControl().valueChanges.subscribe(val => console.log(val));
-...
+    let $formControl = $('input').asFormControl().valueChanges.subscribe(val => console.log(val));
+    ...
 </script>
 ```
 
@@ -175,8 +179,8 @@ https://unpkg.com/observable-forms/dist/index.js
 
 ```html
 <script type="module">
-import {} from "https://unpkg.com/observable-forms/dist/index.js";
-...
+    import {} from "https://unpkg.com/observable-forms/dist/index.js";
+    ...
 </script>
 ```
 

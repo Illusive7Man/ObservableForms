@@ -36,7 +36,7 @@ import {ControlTree, ControlTreePath, DeepPartial, FormControlStatus, FormContro
  *
  * ```
  * let form = $('#passwords input').asFormGroup<{password: string; passwordConfirm: string}>()
- *      .setValidators([passwordMatchValidator]);
+ *      .enableValidation().setValidators([passwordMatchValidator]);
  *
  *
  * function passwordMatchValidator(g: FormGroup) {
