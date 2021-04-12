@@ -32,7 +32,7 @@ import {FormControlStatus, FormControlType, ValidationErrors} from "./common/typ
  * The following example initializes the control with a validator.
  *
  * ```ts
- * let control = $('#my-input').asFormControl().setValidators([Validators.required]);
+ * let control = $('#my-input').asFormControl().enableValidation().setValidators([Validators.required]);
  * console.log(control.value);      // ''
  * console.log(control.status);     // 'INVALID'
  * ```
