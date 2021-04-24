@@ -392,8 +392,8 @@ export abstract class AbstractControl {
         this._existingValidationSubscription.unsubscribe();
         this.manualValidityUpdateSubject.complete();
 
-        this.validityPopper.state.elements.popper.remove();
-        this.validityPopper.destroy();
+        this.validityPopper?.state.elements.popper.remove();
+        this.validityPopper?.destroy();
 
         (this as {isValidationEnabled: boolean}).isValidationEnabled = false;
     }
