@@ -22,8 +22,10 @@ import {ValidatorFn} from "../common/types";
  */
 export function attachPopper(abstractControl: AbstractControl): void {
 
+    let isVanilla = ConfigService.popperConfig.style === 'vanilla';
+
     let $popper = $(`
-        <span class="popper validation" role="tooltip">
+        <span class="popper validation ${isVanilla ? 'vanilla' : null}" role="tooltip">
             <span class="field-validation"></span>
             <span class="popper__arrow" data-popper-arrow></span>
         </span>
@@ -33,7 +35,7 @@ export function attachPopper(abstractControl: AbstractControl): void {
     abstractControl.validityPopper = createPopper($('body')[0], $popper[0], {
         modifiers: [
             {...preventOverflow, options: {rootBoundary: 'document'}},
-            {...flip, options: {fallbackPlacements: [ConfigService.popperConfig.fallbackPosition], rootBoundary: 'document'}},
+            {...flip, options: {fallbackPlacements: [ConfigService.popperConfig.fallbackPosition], rootBoundary: 'document'}, enabled: !isVanilla},
             {...offset, options: {offset: arg0 => ['left', 'right'].includes(arg0.placement) ? [0, 5] : [0, 0]} as Options}]
     });
 

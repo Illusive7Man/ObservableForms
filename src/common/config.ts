@@ -55,5 +55,5 @@ export class ConfigService {
     /**
      * Determines default behavior of popper validation elements.
      */
-    static popperConfig: {[key in 'defaultPosition' | 'fallbackPosition']: Placement} = {defaultPosition: 'left', fallbackPosition: 'top'}
+    static popperConfig: {style: 'popover' | 'vanilla',  defaultPosition: Placement, fallbackPosition: Placement} = {style: 'popover', defaultPosition: 'left', fallbackPosition: 'top'}
 }
