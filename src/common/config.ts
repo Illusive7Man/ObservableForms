@@ -3,6 +3,7 @@
  */
 import { observeShadowRoot, stopObservingShadowRoot } from "./controlObserver";
 import {ValidatorFn} from "./types";
+import {Placement} from "@popperjs/core";
 
 export class ConfigService {
 
@@ -50,4 +51,9 @@ export class ConfigService {
      * ```
      */
     static validationErrors: {[key: string]: string} = {};
+
+    /**
+     * Determines default behavior of popper validation elements.
+     */
+    static popperConfig: {style: 'popover' | 'vanilla',  defaultPosition: Placement, fallbackPosition: Placement} = {style: 'popover', defaultPosition: 'left', fallbackPosition: 'top'}
 }

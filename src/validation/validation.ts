@@ -1,13 +1,13 @@
-﻿import {debounceTime, delay, distinctUntilChanged, filter, map, share, shareReplay, startWith, switchMap, take, takeWhile, tap} from "rxjs/operators";
-import {createPopperLite as createPopper, Modifier, Placement} from "@popperjs/core/dist/esm";
+﻿import {distinctUntilChanged, filter, map, shareReplay, switchMap, take, takeWhile, tap} from "rxjs/operators";
+import {createPopperLite as createPopper, Placement} from "@popperjs/core/dist/esm";
 import flip from '@popperjs/core/lib/modifiers/flip.js';
 import preventOverflow from '@popperjs/core/lib/modifiers/preventOverflow.js';
 import offset from '@popperjs/core/lib/modifiers/offset.js';
 import {Options} from '@popperjs/core/lib/modifiers/offset';
-import {BehaviorSubject, fromEvent, merge, NEVER, of, Subject} from "rxjs";
-import {checkIfRadioControl, isFormControl, checkIfCheckboxControl, isInputElement} from "../common/misc";
-import {fromFullVisibility} from "../observables/fromFullVisibility";
-import {fromResize} from "../observables/fromResize";
+import {BehaviorSubject, fromEvent, merge, of} from "rxjs";
+import {isFormControl, isInputElement} from "../common/misc";
+import {fromFullVisibility} from "../common/observables/fromFullVisibility";
+import {fromResize} from "../common/observables/fromResize";
 import {cachedControlsAndGroups} from "../common/cache";
 import {ConfigService} from "../common/config";
 import {FormControl} from "../formControl";
@@ -21,19 +21,23 @@ import {ValidatorFn} from "../common/types";
  * @param abstractControl Form control / group the popper attaches to.
  */
 export function attachPopper(abstractControl: AbstractControl): void {
-    
+
+    let isVanilla = ConfigService.popperConfig.style === 'vanilla';
+
     let $popper = $(`
-        <span class="popper validation" role="tooltip">
+        <span class="popper validation ${isVanilla ? 'vanilla' : null}" role="tooltip">
             <span class="field-validation"></span>
             <span class="popper__arrow" data-popper-arrow></span>
         </span>
         `);
 
     // Config: overflows document -> flips to top. Left and right poppers have 5px offset.
-    abstractControl.validityPopper = createPopper($('body')[0], $popper[0], { modifiers: [
+    abstractControl.validityPopper = createPopper($('body')[0], $popper[0], {
+        modifiers: [
             {...preventOverflow, options: {rootBoundary: 'document'}},
-            {...flip, options: {fallbackPlacements: ['top'], rootBoundary: 'document'}},
-            {...offset, options: {offset: arg0 => ['left', 'right'].includes(arg0.placement) ? [0, 5] : [0, 0]} as Options}]});
+            {...flip, options: {fallbackPlacements: [ConfigService.popperConfig.fallbackPosition], rootBoundary: 'document'}, enabled: !isVanilla},
+            {...offset, options: {offset: arg0 => ['left', 'right'].includes(arg0.placement) ? [0, 5] : [0, 0]} as Options}]
+    });
 
 
     // Catch manual setting of placement
@@ -72,17 +76,20 @@ export function attachPopper(abstractControl: AbstractControl): void {
 
     // Visibility - position/placement update
     let v$ =
-    reference$.pipe(takeWhile(_ => !isPlacedManually), switchMap($reference => fromFullVisibility($reference[0])), takeWhile(_ => !isPlacedManually))
-        .subscribe(isFullyVisible => isFullyVisible ? updatePopperPlacement(abstractControl) : $popper.css('visibility', 'hidden')); // updatePopperPlacement knows about visibility
+        reference$.pipe(takeWhile(_ => !isPlacedManually), switchMap($reference => fromFullVisibility($reference[0])), takeWhile(_ => !isPlacedManually))
+            .subscribe(isFullyVisible => isFullyVisible ? updatePopperPlacement(abstractControl) : $popper.css('visibility', 'hidden')); // updatePopperPlacement knows about visibility
 
     // Resize - position tracking
     let r$ =
-    reference$.pipe(
-        switchMap($reference => fromResize($reference[0]))
-    ).subscribe(_ => abstractControl.validityPopper.forceUpdate());
+        reference$.pipe(
+            switchMap($reference => fromResize($reference[0]))
+        ).subscribe(_ => abstractControl.validityPopper.forceUpdate());
 
     // Dispose logic
-    abstractControl.valueChanges.subscribe(null, null, () => {v$.unsubscribe(); r$.unsubscribe();});
+    abstractControl.valueChanges.subscribe(null, null, () => {
+        v$.unsubscribe();
+        r$.unsubscribe();
+    });
 
     // Handle display of errors
     let dirtyObservable$ = (abstractControl as any).dirtySubject.asObservable().pipe(
@@ -90,10 +97,10 @@ export function attachPopper(abstractControl: AbstractControl): void {
 
     let popperShownSubject = new BehaviorSubject<boolean>(false);
     abstractControl.isValidityMessageShown$ = popperShownSubject.asObservable().pipe(distinctUntilChanged());
-    
+
     let wasValidityMessageShown = false;
     abstractControl.isValidityMessageShown$.pipe(filter(isShown => isShown === true), take(1)).subscribe(_ => wasValidityMessageShown = true);
-    
+
     merge(abstractControl.statusChanges, dirtyObservable$).pipe(
         switchMap(_ => abstractControl.toJQuery().is(':focus') && wasValidityMessageShown === false
             ? fromEvent(abstractControl.toJQuery(), 'blur')
@@ -109,11 +116,11 @@ export function attachPopper(abstractControl: AbstractControl): void {
                 // Form groups, by default, show their errors once all of their descendants become dirty
                 if (abstractControl instanceof FormGroup && flattenControls(abstractControl.controls).some(formControl => formControl.pristine) && wasValidityMessageShown === false)
                     return;
-                    
+
                 let errorMessage = Object.keys(abstractControl.errors).map(key => typeof abstractControl.errors[key] === 'string' ? abstractControl.errors[key] : ConfigService.validationErrors[key]).join('\n');
 
                 errorMessage && $popper.find('.field-validation').addClass('field-validation-error').html(errorMessage);
-                
+
                 if (abstractControl.enabled) {
                     $popper.show();
                     popperShownSubject.next(true);
@@ -127,8 +134,8 @@ export function attachPopper(abstractControl: AbstractControl): void {
                 $popper.find('.field-validation').removeClass('field-validation-error').text('');
                 popperShownSubject.next(false);
             }
-            
-    });
+
+        });
 
 }
 
@@ -145,7 +152,7 @@ export function setValidationRulesFromAttributes(formControl: FormControl): void
     for (let attribute in ConfigService.registeredAttributeValidators)
         if (formControl.toJQuery().attr(attribute) !== undefined)
             validators = validators.concat(Array.isArray(ConfigService.registeredAttributeValidators[attribute]) ? ConfigService.registeredAttributeValidators[attribute] as ValidatorFn[] : [ConfigService.registeredAttributeValidators[attribute] as ValidatorFn]);
-    
+
 
     if (validators.length > 0)
         formControl.setValidators(validators);
@@ -156,7 +163,7 @@ export function setValidationRulesFromAttributes(formControl: FormControl): void
  * Returns reference and placement (left / right) of the popper.
  * @param abstractControl
  */
-function determinePopperPositioning(abstractControl: AbstractControl): {$reference: JQuery<HTMLElement>, placement: Placement} {
+function determinePopperPositioning(abstractControl: AbstractControl): { $reference: JQuery<HTMLElement>, placement: Placement } {
     let jQueryObject = abstractControl.toJQuery();
     let $predefinedReference: JQuery<HTMLElement> = jQueryObject.attr('popper-reference') ? jQueryObject.closest(jQueryObject.attr('popper-reference')) as any : null;
 
@@ -168,6 +175,9 @@ function determinePopperPositioning(abstractControl: AbstractControl): {$referen
 
         if (predefinedPlacement)
             return predefinedPlacement;
+
+        if (ConfigService.popperConfig.defaultPosition !== 'left')
+            return ConfigService.popperConfig.defaultPosition;
 
         if (abstractControl instanceof FormControl && reference)
             return hasInputsOnLeft(abstractControl.toJQuery(), reference) ? 'right' : 'left';

@@ -13,5 +13,5 @@ extendFormElements();
 export {FormControlType, ValidatorFn, FormControlStatus} from './common/types';
 
 /*===== Miscellaneous =====*/
-export {fromFullVisibility} from './observables/fromFullVisibility';
-export {fromResize} from './observables/fromResize';
+export {fromFullVisibility} from './common/observables/fromFullVisibility';
+export {fromResize} from './common/observables/fromResize';
