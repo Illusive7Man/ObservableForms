@@ -6,10 +6,10 @@ Inspired by Angular forms.
 </div>
 <br/><br/><br/><br/>
 
-With this library, you can effortlessly create an interactive representation of your html form,
+With this library you can effortlessly create an interactive representation of your html form,
 whose API is based on reactive patterns.<br/>
 Instead of manually selecting and attaching JavaScript code to form's elements,
-a more direct, explicit, access to elements' functionalities is provided through objects called `FormControl` and `FormGroup`.<br/>
+a more explicit access to form model is provided through objects called `FormControl` and `FormGroup`.<br/>
 This library, using observables and static type checking, offers a modern workflow for all types of projects,
 without even requiring a build process (TypeScript or bundlers). It can be used with server rendered templates (.NET MVC, PHP, Django, etc.),
 and with SPAs.
@@ -34,8 +34,7 @@ Creating and using a form control is pretty simple:
 
 ```typescript
 // Module imports
-import {switchMap, tap} from "rxjs/operators";
-import {FormControlStatus} from "./types";
+import ...
 
 // FormControl created
 let firstName = $('#firstName').asFormControl().enableValidation();
@@ -57,7 +56,7 @@ isPaymentDifferentFromDelivery$.pipe(switchMap(isDifferent => isDifferent
     : deliveryAddress.valueChanges.pipe(tap(value => paymentAddress.setValue(value)))
 )).subscribe();
 
-// Code ends up being more concise and cleaner (no removeEventListener())
+// RxJS produces a more concise code (no removeEventListener())
 ```
 <br/>
 
@@ -127,8 +126,7 @@ These demos will try to cover as many scenarios as possible, such as:
 
 _Note: These demos are hosted on codesandbox, and code behind the forms can be accessed using the "Open Sandbox" button.
 Fullscreen view is preferable, considering the style of validation messages.
-Styling will be configurable in the future versions,
-but for now, it can be turned off, so a custom implementation can be used._<br/>
+Styling can be changed, as shown in the comments of Demo 1._<br/>
 
 ### Demo 1 - "A standard form"
 A JavaScript project covering a lot of library's functionalities, and showing how to integrate type checking into JavaScript code.<br/>

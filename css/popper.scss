@@ -247,3 +247,19 @@ $small-box-shadow: 0 3px 7px 0 rgba(0, 0, 0, 0.1);
 .col-12 ~ .tooltip-symbol {
     left: calc(100% - 13px);
 }
+
+/*===== Vanilla =====*/
+.popper.vanilla {
+    box-shadow: none;
+    background: transparent;
+    margin-top: 0 !important;
+
+    .popper__arrow {
+        display: none;
+    }
+
+    .field-validation-error {
+        margin-top: 0;
+        color: red;
+    }
+}
