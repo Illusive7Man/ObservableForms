@@ -13,6 +13,10 @@ a more explicit access to form model is provided through objects called `FormCon
 This library, using observables and static type checking, offers a modern workflow for all types of projects,
 without even requiring a build process (TypeScript or bundlers). It can be used with server rendered templates (.NET MVC, PHP, Django, etc.),
 and with SPAs.
+
+Demo usage:
+<img src="https://i.imgur.com/ahYEZba.jpeg"/>
+
 ##### Prerequisites:
 - Basic knowledge of RxJS.<br/>
 
@@ -134,16 +138,16 @@ A JavaScript project covering a lot of library's functionalities, and showing ho
 
 _Note: that CodeSandbox has some built-in js bundler that allows non-standard imports in .js files.
 Below those imports are comments on how they should be used plain .js files._
-<br/>
+<br/><br/>
 ### Demo 2 - "Custom made"
 A TypeScript project covering custom form controls. Also demonstrates support for Web Components.<br/>
 [Demo 2](https://dxrdg.csb.app/)
-
+<br/><br/>
 
 ### Demo 3 - "Form update"
 A JavaScript project showing how to change form's data and how to reset it.<br/>
 [Demo 3](https://rysti.csb.app/)
-
+<br/><br/>
 <a name="installation"/>
 
 ## Installation
