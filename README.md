@@ -10,7 +10,7 @@ With this library you can effortlessly create an interactive representation of y
 whose API is based on reactive patterns.<br/>
 Instead of manually selecting and attaching JavaScript code to form's elements,
 a more explicit access to form model is provided through objects called `FormControl` and `FormGroup`.<br/>
-This library, using observables and static type checking, offers a modern workflow for all types of projects,
+This library, using <strong>observables</strong> and <strong>static type checking</strong>, offers a modern workflow for all types of projects,
 without even requiring a build process (TypeScript or bundlers). It can be used with server rendered templates (.NET MVC, PHP, Django, etc.),
 and with SPAs.
 
