@@ -26,7 +26,7 @@ export function findFormControls(element: Element, onlyActive = false): Element[
     return element.matches(controlSelector)
         ? [element]
         : element.hasAttribute('formControl-shadow-root')
-            ? [...element.shadowRoot.children].filter(child => !(child instanceof HTMLStyleElement)).flatMap(e => findFormControls(e, onlyActive))
+            ? [...element.children].flatMap(e => findFormControls(e, onlyActive)).concat([...element.shadowRoot.children].filter(child => !(child instanceof HTMLStyleElement)).flatMap(e => findFormControls(e, onlyActive)))
             : [...element.querySelectorAll(controlSelector),
                 ...[...element.querySelectorAll('[formControl-shadow-root]')].flatMap(shadowHost => findFormControls(shadowHost))];
 }

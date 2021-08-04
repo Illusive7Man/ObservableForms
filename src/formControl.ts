@@ -70,7 +70,8 @@ export class FormControl<TValue = any> extends AbstractControl {
 
         this.setupObservables(valueChangesUI, touchedUI$, dirtyUI$);
 
-        addToCache(this);
+        if (jQueryObject.length !== 0)
+            addToCache(this);
     }
 
     /**
