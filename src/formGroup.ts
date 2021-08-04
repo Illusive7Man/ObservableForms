@@ -78,7 +78,7 @@ export class FormGroup<TControls = any> extends AbstractControl {
     ) {
         super(jQueryObject);
 
-        if (jQueryObject == null) {
+        if (jQueryObject == null || jQueryObject.length === 0) {
             this.setupEmptyGroup();
             return;
         }
