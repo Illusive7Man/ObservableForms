@@ -20,7 +20,7 @@ export function fromResize(target: HTMLElement): Observable<void> {
             let resizeObserver = new ResizeObserver(_ => resizeObserverSubscriber.next(null));
 
             resizeObserver.observe(target);                                                         // Observe reference's resize
-            resizeObserverSubscriber.add(_ => resizeObserver.disconnect());
+            resizeObserverSubscriber.add(() => resizeObserver.disconnect());
 
         }).pipe(
             tap(_ => isFresh ? (isFresh = false) || subscriber.next() : isTransition = true), // Do the first one
