@@ -149,7 +149,34 @@ export class FormControl<TValue = any> extends AbstractControl {
 
         let s3 = dirtyUI$.subscribe(_ => this.markAsDirty());
 
-        this.subscriptions.add(s1).add(s2).add(s3);
+        this.subscriptions.add(s1);
+        this.subscriptions.add(s2);
+        this.subscriptions.add(s3);
+
+
+        /*=== Status observables ===*/
+
+        // Programmatically update the validity.
+        this.manualValidityUpdateSubject = new Subject<void>();
+
+        setValidationRulesFromAttributes(this as any);
+
+        (this as {statusChanges: Observable<any>}).statusChanges = merge(
+            this.valueChanges,
+            this.manualValidityUpdateSubject.asObservable(),
+            this.disabledSubject.pipe(distinctUntilChanged())
+        ).pipe(
+            startWith(''),
+            tap(_ => (this as {errors: ValidationErrors}).errors = this.getValidators()?.map(validatorFn => validatorFn(this)).reduce((acc, curr) => curr ? {...acc, ...curr} : acc, null)),
+            map(_ => this.toJQuery().attr('disabled') ? FormControlStatus.DISABLED : this.errors ? FormControlStatus.INVALID : FormControlStatus.VALID),
+
+            share()
+        );
+
+        // Subscribe for status update
+        this._existingValidationSubscription =
+            this.statusChanges.subscribe(status => (this as {status: FormControlStatus}).status = status);
+
     }
 
     valueMap(mapFn: (value: TValue) => any): this {
@@ -165,27 +192,6 @@ export class FormControl<TValue = any> extends AbstractControl {
             return this;
 
         (this as {isValidationEnabled: boolean}).isValidationEnabled = true;
-
-        // Programmatically update the validity.
-        this.manualValidityUpdateSubject = new Subject<void>();
-
-        setValidationRulesFromAttributes(this as any);
-
-        (this as {statusChanges: Observable<any>}).statusChanges = merge(
-            this.valueChanges.pipe(observeOn(asapScheduler)),
-            this.manualValidityUpdateSubject.asObservable(),
-            this.disabledSubject.pipe(distinctUntilChanged())
-        ).pipe(
-            startWith(''),
-            tap(_ => (this as {errors: ValidationErrors}).errors = this.getValidators()?.map(validatorFn => validatorFn(this)).reduce((acc, curr) => curr ? {...acc, ...curr} : acc, null)),
-            map(_ => this.toJQuery().attr('disabled') ? FormControlStatus.DISABLED : this.errors ? FormControlStatus.INVALID : FormControlStatus.VALID),
-
-            share()
-        );
-
-        // Subscribe for status update
-        this._existingValidationSubscription =
-            this.statusChanges.subscribe(status => (this as {status: FormControlStatus}).status = status);
 
         // Attach popper
         if (withUIElements && this.toJQuery().length)

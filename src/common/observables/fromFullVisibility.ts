@@ -25,6 +25,6 @@ export function fromFullVisibility(target: HTMLElement): Observable<boolean> {
 
         documentIntersectionObserver.observe(target);
 
-        subscriber.add(_ => documentIntersectionObserver.disconnect());
+        subscriber.add(() => documentIntersectionObserver.disconnect());
     });
 }
