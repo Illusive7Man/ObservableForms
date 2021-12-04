@@ -78,7 +78,7 @@ export class FormGroup<TControls = any> extends AbstractControl {
     ) {
         super(jQueryObject);
 
-        if (jQueryObject == null) {
+        if (jQueryObject == null || jQueryObject.length === 0) {
             this.setupEmptyGroup();
             return;
         }
@@ -344,7 +344,48 @@ export class FormGroup<TControls = any> extends AbstractControl {
 
         let s3 = dirtyUI$.subscribe(_ => this.markAsDirty());
 
-        this.subscriptions.add(s1).add(s2).add(s3);
+        this.subscriptions.add(s1);
+        this.subscriptions.add(s2);
+        this.subscriptions.add(s3);
+
+
+        /*=== Status observables ===*/
+
+        // Programmatically update the validity.
+        this.manualValidityUpdateSubject = new Subject<void>();
+
+        // Enabled/disabled is retrieved from status, so this observable is handled locally
+        let isGroupDisabled = false;
+        this.disabledSubject.subscribe(isDisabled => isGroupDisabled = isDisabled);
+
+        (this as {statusChanges: Observable<any>}).statusChanges = merge(
+            this.valueChanges,
+            this.controlsArray$.pipe(switchMap(controls => merge(...controls.map(c => (c as any).hiddenSubject.pipe(distinctUntilChanged()))).pipe(startWith('')))),
+            this.manualValidityUpdateSubject.asObservable(),
+            this.disabledSubject.pipe(distinctUntilChanged())
+        ).pipe(
+            startWith(''),
+            // Note 1: Status changes when the value changes, which includes changes in enabled/disabled of its controls
+            // Note 2: When one of the controls becomes (or stops being) hidden, status should recalculate
+
+            filter(_ => !this.updateGroupOncePause),
+            startWith(''),
+            tap(_ => (this as {errors: ValidationErrors}).errors = this.getValidators()?.map(validatorFn => validatorFn(this)).reduce((acc, curr) => curr ? {...acc, ...curr} : acc, null)),
+            map(_ => isGroupDisabled
+                ? FormControlStatus.DISABLED
+                : this.errors || this.controlsArray.some(formControl => formControl.errors && formControl.enabled && [...formControl.toJQuery()].some(e => e.getAttribute('type') !== 'hidden'))
+                    ? FormControlStatus.INVALID : FormControlStatus.VALID),
+            // Note: Invalid when either object itself or some of the selected non-hidden, non-disabled, controls have errors.
+
+            share()
+        );
+
+        // Subscribe for status update
+        let s4 =
+            this.statusChanges.subscribe(status => (this as {status: FormControlStatus}).status = status);
+
+        this._existingValidationSubscription = new Subscription();
+        this._existingValidationSubscription.add(s4);
     }
 
     valueMap(mapFn: (value: TControls) => any): this {
@@ -362,46 +403,14 @@ export class FormGroup<TControls = any> extends AbstractControl {
         (this as {isValidationEnabled: boolean}).isValidationEnabled = true;
 
         let s1 =
-        this.controlsArray$.subscribe(controls => controls.forEach(control => !control.isValidationEnabled && control.enableValidation(withUIElements)));
+            this.controlsArray$.subscribe(controls => controls.forEach(control => !control.isValidationEnabled && control.enableValidation(withUIElements)));
 
-        // Programmatically update the validity.
-        this.manualValidityUpdateSubject = new Subject<void>();
-
-        // Enabled/disabled is retrieved from status, so this observable is handled locally
-        let isGroupDisabled = false;
-        this.disabledSubject.subscribe(isDisabled => isGroupDisabled = isDisabled);
-
-        (this as {statusChanges: Observable<any>}).statusChanges = merge(
-                this.valueChanges.pipe(observeOn(asapScheduler)),
-                this.controlsArray$.pipe(switchMap(controls => merge(...controls.map(c => (c as any).hiddenSubject.pipe(distinctUntilChanged()))).pipe(startWith('')))),
-                this.manualValidityUpdateSubject.asObservable(),
-                this.disabledSubject.pipe(distinctUntilChanged())
-            ).pipe(
-                startWith(''),
-                // Note 1: Status changes when the value changes, which includes changes in enabled/disabled of its controls
-                // Note 2: When one of the controls becomes (or stops being) hidden, status should recalculate
-
-                filter(_ => !this.updateGroupOncePause),
-                startWith(''),
-                tap(_ => (this as {errors: ValidationErrors}).errors = this.getValidators()?.map(validatorFn => validatorFn(this)).reduce((acc, curr) => curr ? {...acc, ...curr} : acc, null)),
-                map(_ => isGroupDisabled
-                    ? FormControlStatus.DISABLED
-                    : this.errors || this.controlsArray.some(formControl => formControl.errors && formControl.enabled && [...formControl.toJQuery()].some(e => e.getAttribute('type') !== 'hidden'))
-                    ? FormControlStatus.INVALID : FormControlStatus.VALID),
-                // Note: Invalid when either object itself or some of the selected non-hidden, non-disabled, controls have errors.
-
-                share()
-        );
-
-        // Subscribe for status update
-        let s2 =
-            this.statusChanges.subscribe(status => (this as {status: FormControlStatus}).status = status);
+        this._existingValidationSubscription.add(s1);
 
         // Attach popper
         if (withUIElements)
             attachPopper(this);
 
-        this._existingValidationSubscription = new Subscription().add(s1).add(s2);
 
         return this;
     }
