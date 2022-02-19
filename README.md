@@ -8,13 +8,10 @@ Inspired by Angular forms.
 
 **Updated to RxJS 7.** 
 <br/>
-With this library you can effortlessly create an interactive representation of your html form,
-whose API is based on reactive patterns.<br/>
+JQuery extension for creating JavaScript object representation of forms. Intended for use in server-side web frameworks  (.NET MVC, PHP, Django, etc.).<br/>
 Instead of manually selecting and attaching JavaScript code to form's elements,
-a more explicit access to form model is provided through objects called `FormControl` and `FormGroup`.<br/>
-This library, using <strong>observables</strong> and <strong>static type checking</strong>, offers a modern workflow for all types of projects,
-without even requiring a build process (TypeScript or bundlers). It can be used with server rendered templates (.NET MVC, PHP, Django, etc.),
-and with SPAs.
+a more explicit access to form model is provided through objects called `FormControl` and `FormGroup`. This library, using <strong>observables</strong> and <strong>static type checking</strong>, offers a modern workflow for all types of projects,
+without even requiring a build process (TypeScript or bundlers).
 
 Demo usage:
 <img src="https://i.imgur.com/ahYEZba.jpeg"/>
