@@ -44,6 +44,6 @@
     "bundle:ds": "dts-bundle-generator -o dist/index.d.ts lib/index.d.ts --inline-declare-global"
   },
   "type": "module",
-  "types": "dist/index.d.ts",
+  "types": "lib/index.d.ts",
   "version": "1.2.1"
 }
