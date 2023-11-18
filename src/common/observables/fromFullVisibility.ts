@@ -19,7 +19,7 @@ export function fromFullVisibility(target: HTMLElement): Observable<boolean> {
         // Parent element handles display perfectly, but doesn't ha
 
         let documentIntersectionObserver = new IntersectionObserver(
-            (entries, _) => subscriber.next(entries[0].intersectionRatio > .9), // sometimes it's .99...
+            (entries, _) => subscriber.next(entries[0].intersectionRatio > .5),
             {root: target.parentElement, threshold: [0.5, 1]}
         );
 
