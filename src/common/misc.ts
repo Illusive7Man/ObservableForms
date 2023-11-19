@@ -44,16 +44,16 @@ export function constructControls(controls: FormControlType[]): ControlTree<any>
     let checkboxElements = getCheckboxElements(controls);
 
     if (checkIfRadioControl(controls) || checkIfCheckboxControl(controls))
-        return {[controls[0].getAttribute('name')]: controls.reduce((acc, curr) => acc.add(curr), $()).asFormControl()};
+        return {[controls[0].getAttribute('name')]: new FormControl(controls.reduce((acc, curr) => acc.concat(curr), [] as FormControlType[]))};
 
-    let combinedControlsArray = controls
-        .filter(element => element.getAttribute('type') !== 'radio' && checkboxElements.includes(element) === false)
-        .map(element => $(element))
-        .concat(combineRadiosAndCheckboxes(controls).map(controlElements => $(controlElements)));
+    let combinedControlsArray = (controls
+        .filter(element => element.getAttribute('type') !== 'radio' && checkboxElements.includes(element) === false) as (FormControlType | FormControlType[])[])
+        .concat(combineRadiosAndCheckboxes(controls));
 
-    combinedControlsArray = combinedControlsArray.filter($e => $e.attr('name'));    // Filter out the nameless controls
+    combinedControlsArray = combinedControlsArray.filter(controlElements => Array.isArray(controlElements) ? controlElements[0]?.hasAttribute('name') : controlElements.hasAttribute('name'));    // Filter out the nameless controls
 
-    return convertArrayToJson(combinedControlsArray.map($control => ({name: $control.attr('name'), value: $control.asFormControl()})));
+    return convertArrayToJson(combinedControlsArray.map(controlElements => ({name: Array.isArray(controlElements) ? controlElements[0]?.getAttribute('name')
+            : controlElements.getAttribute('name'), value: new FormControl(controlElements)})));
 }
 
 /**

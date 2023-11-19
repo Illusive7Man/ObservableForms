@@ -22,6 +22,8 @@ import {ControlTree, ControlTreePath, DeepPartial, FormControlStatus, FormContro
  * ### Create a form group with 2 controls
  *
  * ```
+ * let form = document.querySelector('form').asFormGroup<{first: string; last: string;}>();
+ * or alternatively,
  * let form = $('form').asFormGroup<{first: string; last: string;}>();
  *
  * console.log(form.value);   // {first: 'Nancy', last; 'Drew'}
@@ -35,6 +37,9 @@ import {ControlTree, ControlTreePath, DeepPartial, FormControlStatus, FormContro
  * that considers the value of more than one child control.
  *
  * ```
+ * let form = document.querySelector('#passwords input').asFormGroup<{password: string; passwordConfirm: string}>()
+ *      .enableValidation().setValidators([passwordMatchValidator]);
+ * or alternatively,
  * let form = $('#passwords input').asFormGroup<{password: string; passwordConfirm: string}>()
  *      .enableValidation().setValidators([passwordMatchValidator]);
  *
@@ -166,6 +171,8 @@ export class FormGroup<TControls = any> extends AbstractControl {
      * ### Set the complete value for the form group
      *
      * ```
+     * const form = document.querySelector('form').asFormGroup<{first: string, last: string}>();
+     * or alternatively,
      * const form = $('form').asFormGroup<{first: string, last: string}>();
      * console.log(form.value);   // {first: '', last: ''}
      *
@@ -208,6 +215,8 @@ export class FormGroup<TControls = any> extends AbstractControl {
      * ### Patch the value for a form group
      *
      * ```
+     * const form = document.querySelector('form').asFormGroup<{first: string, last: string}>();
+     * or alternatively,
      * const form = $('form').asFormGroup<{first: string, last: string}>();
      * console.log(form.value);   // {first: null, last: null}
      *

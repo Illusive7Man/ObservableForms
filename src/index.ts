@@ -7,7 +7,8 @@ export * from './common/misc';
 export {ConfigService} from './common/config';
 
 import {extendJQueryElements} from './jQueryExtend';
-extendJQueryElements();
+if (window['jQuery'])
+    extendJQueryElements();
 
 import {extendVanillaElements} from './vanillaExtend';
 extendVanillaElements();

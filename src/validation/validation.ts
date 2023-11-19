@@ -94,7 +94,7 @@ export function attachPopper(abstractControl: AbstractControl): void {
 
     // Handle display of errors
     let dirtyObservable$ = (abstractControl as any).dirtySubject.asObservable().pipe(
-        map(_ => abstractControl instanceof FormGroup ? flattenControls(abstractControl.controls).every($c => $c.dirty) : abstractControl.dirty), distinctUntilChanged());
+        map(_ => abstractControl instanceof FormGroup ? flattenControls(abstractControl.controls).every(c => c.dirty) : abstractControl.dirty), distinctUntilChanged());
 
     let popperShownSubject = new BehaviorSubject<boolean>(false);
     abstractControl.isValidityMessageShown$ = popperShownSubject.asObservable().pipe(distinctUntilChanged());

@@ -24,6 +24,8 @@ import {FormControlStatus, FormControlType, ValidationErrors} from "./common/typ
  * Instantiate a `FormControl`.
  *
  * ```ts
+ * let control = document.querySelector('#my-input').asFormControl();
+ * or alternatively,
  * let control = $('#my-input').asFormControl();
  * console.log(control.value);     // '<value of the input>'
  *```
@@ -31,6 +33,8 @@ import {FormControlStatus, FormControlType, ValidationErrors} from "./common/typ
  * The following example initializes the control with a validator.
  *
  * ```ts
+ * let control = document.querySelector('#my-input').asFormControl().enableValidation().setValidators([Validators.required]);
+ * or alternatively,
  * let control = $('#my-input').asFormControl().enableValidation().setValidators([Validators.required]);
  * console.log(control.value);      // ''
  * console.log(control.status);     // 'INVALID'
