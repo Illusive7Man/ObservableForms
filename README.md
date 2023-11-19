@@ -1,28 +1,29 @@
-<div><img align="left" src="https://i.imgur.com/41C5GKI.png" alt="Observable logo" width="200"/>
+<div><img align="left" src="https://i.imgur.com/1rgGsIA.png" alt="Observable logo" width="200"/>
 
 
-# Observable Forms (for jQuery) [![npm version](https://badge.fury.io/js/observable-forms.svg)](http://badge.fury.io/js/observable-forms)
-Inspired by Angular forms.
+# &nbsp;&nbsp;Observable Forms [![npm version](https://badge.fury.io/js/observable-forms.svg)](http://badge.fury.io/js/observable-forms)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Inspired by Angular forms.
 </div>
 <br/><br/><br/><br/>
 
-**Updated to RxJS 7.** 
+### Version 2
+Removed jQuery dependency. Added support for native HTMLElement and NodeList.
 <br/>
-JQuery extension for creating JavaScript object representation of forms. Intended for use in server-side web frameworks  (.NET MVC, PHP, Django, etc.).<br/>
+
+## Introduction
+
+Extension for creating JavaScript object representation of html forms. Intended for use in non-JavaScript SSR web frameworks  (Spring MVC, PHP, .NET MVC, Django...).<br/>
 Instead of manually selecting and attaching JavaScript code to form's elements,
-a more explicit access to form model is provided through objects called `FormControl` and `FormGroup`. This library, using <strong>observables</strong> and <strong>static type checking</strong>, offers a modern workflow for all types of projects,
-without even requiring a build process (TypeScript or bundlers).
+ access to form model is provided through objects called `FormControl` and `FormGroup` that are created from `HTMLElement` or `NodeList`.
+Using static type checking and reactive properties, this library enables you to create and manage forms reactively in any project, without the need for a build process.
 
-Demo usage:
-<img src="https://i.imgur.com/ahYEZba.jpeg"/>
+<figure>
+<img src="https://i.imgur.com/ahYEZba.jpeg" alt="code example">
+  <figcaption>Demo usage</figcaption>
+</figure>
 
-##### Prerequisites:
-- Basic knowledge of RxJS.<br/>
-
-##### Table of Contents
-- [Functionality & Usage](#functionality)<br/>
-- [Demos](#demos)<br/>
-- [Installation](#installation)<br/>
+### Prerequisites:
+- Knowledge of RxJS.<br/>
 
 <a name="functionality"/>
 
@@ -33,33 +34,33 @@ This is one of the two fundamental building blocks of Observable Forms, along wi
 `FormGroup`. It tracks the value and validation status of an individual form control
 (a single text input, a set of radio inputs with the same name, etc.).
 
-Creating and using a form control is pretty simple:
+Example of creating and using a form control:
 
 ```typescript
 // Module imports
 import ...
 
 // FormControl created
-let firstName = $('#firstName').asFormControl().enableValidation();
+let firstName = document.getElementById('firstName').asFormControl().enableValidation();
 firstName.valueChanges.subscribe(value => console.log('My new value is: ' + value));
 
 // ... let's try something a bit more complicated
 // Either copy the delivery address into payment address field,
 // or track payment address status, and alert the user if invalid (validation logic not shown)
 
-let deliveryAddress = $('#delivery-address').asFormControl();
-let paymentAddress = $('#payment-address').asFormControl().enableValidation();
+// Using delivery and payment controls
+let deliveryAddress = document.getElementById('delivery-address').asFormControl();
+let paymentAddress = document.getElementById('payment-address').asFormControl().enableValidation();
 
-// Observable<boolean>
-let isPaymentDifferentFromDelivery$ = $('#different-checkbox').asFormControl().valueChanges
+// Check if they should be the same 
+let areAddressesDifferent$ = document.getElementById('different-checkbox').asFormControl().valueChanges
     .pipe(map(value => value === 'true'), startWith(false));
 
-isPaymentDifferentFromDelivery$.pipe(switchMap(isDifferent => isDifferent
+// And either validate payment address if different, or use value of delivery address
+areAddressesDifferent$.pipe(switchMap(value => value
     ? paymentAddress.statusChanges.pipe(tap(status => status === FormControlStatus.INVALID && alert('Entered address is not valid')))
     : deliveryAddress.valueChanges.pipe(tap(value => paymentAddress.setValue(value)))
 )).subscribe();
-
-// RxJS produces a more concise code (no removeEventListener())
 ```
 <br/>
 
@@ -69,7 +70,7 @@ with each control's name as the key. Name is either control's `name` attribute o
 Class of this object accepts a **type parameter** representing the model of the form group,
 which provides static type checking when working with the controls and values.<br/>
 <ins>Type checking is also available in plain JavaScript no-build projects, as demonstrated in the Demos.</ins><br/><br/>
-_Author's note: The best and easiest way to have type checking is to find a tool
+_Author's note: The easiest way to have type checking is to find a tool
 that will generate TypeScript versions of your backend classes, and use those as type parameters of form groups.
 Here's the one I use for .NET MVC, [link](https://www.nuget.org/packages/TypeScriptBuilder)._
 
@@ -90,7 +91,7 @@ class MyForm {
 }
 
 // Create a form group (TS version)
-let form = $('form').asFormGroup<MyForm>();
+let form = document.querySelector('form').asFormGroup<MyForm>();
 
 // Accessing child controls and value, with editor providing type information
 form.controls.fullName.valueChanges.subscribe(_ => '...')
@@ -158,7 +159,7 @@ Inside a html script tag, or in javascript:
     import {} from "./node_modules/observable-forms/dist/index.js";
     // Library self initializes when module is loaded.
 
-    let $formControl = $('input').asFormControl().valueChanges.subscribe(val => console.log(val));
+    let formControl = document.querySelector('input').asFormControl().valueChanges.subscribe(val => console.log(val));
     ...
 </script>
 ```
@@ -171,7 +172,7 @@ import {ConfigService, Validators} from "observable-forms";
 ConfigService.registerAttributeValidators({
     'data-val-required': Validators.required,
     'data-val-email': Validators.email,
-    'data-val-url': $e => $e.val() === '' || URL_REGEXP.test($e.val()) ? null : {url: true}
+    'data-val-url': c => c.value === '' || URL_REGEXP.test(c.value) ? null : {url: true}
 });
 ```
 ### CDN

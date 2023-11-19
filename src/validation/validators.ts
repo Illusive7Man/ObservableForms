@@ -154,13 +154,13 @@ export class Validators {
      *
      */
     static required(control: AbstractControl) {
-        let isRadioControl = checkIfRadioControl(control.toJQuery());
-        let isCheckboxControl = checkIfCheckboxControl(control.toJQuery());
+        let isRadioControl = checkIfRadioControl(control.source);
+        let isCheckboxControl = checkIfCheckboxControl(control.source);
 
         let hasValue = true;
-        if (isRadioControl && control.toJQuery().toArray().every((element: HTMLInputElement) => !element.checked))
+        if (isRadioControl && [...[control.source]].flat().every((element: HTMLInputElement) => !element.checked))
             hasValue = false;
-        else if (isCheckboxControl && control.toJQuery().filter('[type=checkbox]').is(':checked') === false)
+        else if (isCheckboxControl && ([...[control.source]].flat().find(e => e.matches('[type=checkbox]') ? e : e.querySelector('[type=checkbox]')) as HTMLInputElement)?.checked !== true)
             hasValue = false;
         else if (!isRadioControl && !isCheckboxControl && isEmptyInputValue(control.value))
             hasValue = false;

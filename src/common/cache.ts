@@ -12,15 +12,18 @@ export const cachedControlsAndGroups: AbstractControl[] = [];
  *
  * Elements are matched by element(s) they select, i.e. control is matched if its element(s) have been previously selected,
  * and group is matched if all of its control and non-control elements have been previously selected.
- * @param object A jQueryObject whose selection is matched, or a HTMLElement to check if some cached element has selected it.
+ * @param object
  */
-export function findCachedElement(object: AbstractControl | JQuery | HTMLElement): AbstractControl | null {
+export function findCachedElement(object: AbstractControl | HTMLElement | HTMLElement[]): AbstractControl | null {
 
-    let selectedElements = object instanceof HTMLElement ? [object] : object instanceof AbstractControl ? [...object.toJQuery()] : object.toArray();
+    let selectedElements: HTMLElement[] = object instanceof HTMLElement ? [object] : Array.isArray(object) ? object : [...[object.source]].flat();
 
     return cachedControlsAndGroups
-        .find(cachedControl => cachedControl.toJQuery().length === selectedElements.length
-            && [...cachedControl.toJQuery()].every(element => selectedElements.includes(element as any))) ?? null;
+        .find(cachedControl => {
+            let elementsInCachedControl = [...[cachedControl.source]].flat();
+            return elementsInCachedControl.length === selectedElements.length
+                && elementsInCachedControl.every(element => selectedElements.includes(element as any));
+        }) ?? null;
 }
 
 /**

@@ -6,8 +6,12 @@ export {Validators} from './validation/validators';
 export * from './common/misc';
 export {ConfigService} from './common/config';
 
-import {extendFormElements} from './jQueryExtend';
-extendFormElements();
+import {extendJQueryElements} from './jQueryExtend';
+if (window['jQuery'])
+    extendJQueryElements();
+
+import {extendVanillaElements} from './vanillaExtend';
+extendVanillaElements();
 
 /*===== Types =====*/
 export {FormControlType, ValidatorFn, FormControlStatus} from './common/types';

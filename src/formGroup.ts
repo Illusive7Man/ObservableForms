@@ -1,9 +1,9 @@
 import {AbstractControl} from "./abstractControl";
-import {checkIfRadioControl, constructControls, convertArrayToJson, convertJsonToArray, isFormControl} from "./common/misc";
-import {FormControl, getFormControlValue} from "./formControl";
-import {asapScheduler, asyncScheduler, BehaviorSubject, fromEvent, merge, Observable, Subject, Subscription} from "rxjs";
+import {constructControls, convertArrayToJson, convertJsonToArray, isFormControl} from "./common/misc";
+import {FormControl} from "./formControl";
+import {asyncScheduler, BehaviorSubject, merge, Observable, Subject, Subscription} from "rxjs";
 import {addToCache, findCachedElement} from "./common/cache";
-import {delay, distinctUntilChanged, filter, map, observeOn, share, startWith, switchMap, tap} from "rxjs/operators";
+import {distinctUntilChanged, filter, map, observeOn, share, startWith, switchMap, tap} from "rxjs/operators";
 import {attachPopper} from "./validation/validation";
 import {ControlTree, ControlTreePath, DeepPartial, FormControlStatus, FormControlType, ValidationErrors, ValidatorFn} from "./common/types";
 
@@ -22,6 +22,8 @@ import {ControlTree, ControlTreePath, DeepPartial, FormControlStatus, FormContro
  * ### Create a form group with 2 controls
  *
  * ```
+ * let form = document.querySelector('form').asFormGroup<{first: string; last: string;}>();
+ * or alternatively,
  * let form = $('form').asFormGroup<{first: string; last: string;}>();
  *
  * console.log(form.value);   // {first: 'Nancy', last; 'Drew'}
@@ -35,6 +37,9 @@ import {ControlTree, ControlTreePath, DeepPartial, FormControlStatus, FormContro
  * that considers the value of more than one child control.
  *
  * ```
+ * let form = document.querySelector('#passwords input').asFormGroup<{password: string; passwordConfirm: string}>()
+ *      .enableValidation().setValidators([passwordMatchValidator]);
+ * or alternatively,
  * let form = $('#passwords input').asFormGroup<{password: string; passwordConfirm: string}>()
  *      .enableValidation().setValidators([passwordMatchValidator]);
  *
@@ -65,30 +70,30 @@ export class FormGroup<TControls = any> extends AbstractControl {
 
     get unindexedArray(): {name: string, control: FormControl}[] {
         return convertJsonToArray(this.controls, true)
-            .filter(({name, value}) => value instanceof FormControl)
+            .filter(({value}) => value instanceof FormControl)
             .map(({name, value}) => ({name, control: value as FormControl}));
     }
 
 
     constructor(
-        jQueryObject?: JQuery,
+        object?: HTMLElement | FormControlType[],
         private valueChangesUI?: Observable<any>,
         private touchedUI$?: Observable<void>,
         private dirtyUI$?: Observable<void>
     ) {
-        super(jQueryObject);
+        super(object);
 
-        if (jQueryObject == null || jQueryObject.length === 0) {
+        if (object == null || Array.isArray(object) && object.length === 0) {
             this.setupEmptyGroup();
             return;
         }
 
         // See if it's cached
-        let cachedElement = findCachedElement(jQueryObject);
+        let cachedElement = findCachedElement(object);
         if (cachedElement)
             return cachedElement as FormGroup<TControls>;
 
-        let selectedControlElements = [...jQueryObject].flatMap(element =>
+        let selectedControlElements = [...[object]].flat().flatMap(element =>
             isFormControl(element)
                 ? element
                 : [...element.querySelectorAll('input, select, textarea, [formControl]'),
@@ -166,6 +171,8 @@ export class FormGroup<TControls = any> extends AbstractControl {
      * ### Set the complete value for the form group
      *
      * ```
+     * const form = document.querySelector('form').asFormGroup<{first: string, last: string}>();
+     * or alternatively,
      * const form = $('form').asFormGroup<{first: string, last: string}>();
      * console.log(form.value);   // {first: '', last: ''}
      *
@@ -208,6 +215,8 @@ export class FormGroup<TControls = any> extends AbstractControl {
      * ### Patch the value for a form group
      *
      * ```
+     * const form = document.querySelector('form').asFormGroup<{first: string, last: string}>();
+     * or alternatively,
      * const form = $('form').asFormGroup<{first: string, last: string}>();
      * console.log(form.value);   // {first: null, last: null}
      *
@@ -241,9 +250,6 @@ export class FormGroup<TControls = any> extends AbstractControl {
      * that matches the structure of your form, with control names as keys. The state
      * is a standalone value or a form state object with both a value and a disabled
      * status.
-     *
-     * @param value Resets the control with an initial value,
-     * or an object that defines the initial value and disabled state.
      *
      * @usageNotes
      *
@@ -285,7 +291,7 @@ export class FormGroup<TControls = any> extends AbstractControl {
 
         this.updateGroupOncePause = true;
 
-        this.unindexedArray.forEach(({name, control}) => control.reset());
+        this.unindexedArray.forEach(({control}) => control.reset());
 
         this.valueChangesSubject.next(getFormGroupValue(this));
         this.updateGroupOncePause = false;
@@ -294,7 +300,7 @@ export class FormGroup<TControls = any> extends AbstractControl {
 
     private setupEmptyGroup(valueChangesUI?: Observable<any>, touchedUI$?: Observable<void>, dirtyUI$?: Observable<void>): void {
         this.controls = {} as ControlTree<any>;
-        this.jQueryObject = $();
+        this._source = [];
 
         this.controlsArraySubject.next([]);
         let s1 = this.controlsArray$.subscribe(controlsArray => this.controlsArray = controlsArray);
@@ -373,7 +379,7 @@ export class FormGroup<TControls = any> extends AbstractControl {
             tap(_ => (this as {errors: ValidationErrors}).errors = this.getValidators()?.map(validatorFn => validatorFn(this)).reduce((acc, curr) => curr ? {...acc, ...curr} : acc, null)),
             map(_ => isGroupDisabled
                 ? FormControlStatus.DISABLED
-                : this.errors || this.controlsArray.some(formControl => formControl.errors && formControl.enabled && [...formControl.toJQuery()].some(e => e.getAttribute('type') !== 'hidden'))
+                : this.errors || this.controlsArray.some(formControl => formControl.errors && formControl.enabled && [...[formControl.source]].flat().some(e => e.getAttribute('type') !== 'hidden'))
                     ? FormControlStatus.INVALID : FormControlStatus.VALID),
             // Note: Invalid when either object itself or some of the selected non-hidden, non-disabled, controls have errors.
 

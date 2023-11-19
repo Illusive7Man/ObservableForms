@@ -1,8 +1,8 @@
-import {BehaviorSubject, fromEvent, merge, Observable, of, Subject, Subscription} from "rxjs";
-import {findCachedElement, removeFromCache} from "./common/cache";
-import {delay, distinctUntilChanged, filter, map, share, startWith, switchMap} from "rxjs/operators";
+import {Observable, Subject, Subscription} from "rxjs";
+import {removeFromCache} from "./common/cache";
+import {distinctUntilChanged, map, share} from "rxjs/operators";
 import {Instance} from "@popperjs/core";
-import {FormControlStatus, ValidationErrors, ValidatorFn} from "./common/types";
+import {FormControlStatus, FormControlType, ValidationErrors, ValidatorFn} from './common/types';
 import {validationEnabled} from "./common/decorators";
 
 /**
@@ -32,8 +32,7 @@ export abstract class AbstractControl {
      * with a key-value pair for each member of the group.
      */
     public readonly value: any;
-
-    constructor(protected jQueryObject: JQuery) {}
+    constructor(protected _source: HTMLElement | FormControlType[]) {}
 
     /**
      * Subject for emitting  dirty / pristine state.
@@ -104,7 +103,7 @@ export abstract class AbstractControl {
      * @returns True if the control is disabled, false otherwise.
      */
     get disabled(): boolean {
-        return this.status ? this.status === FormControlStatus.DISABLED : this.toJQuery()[0]?.hasAttribute('disabled');
+        return this.status ? this.status === FormControlStatus.DISABLED : this.source instanceof HTMLElement ? this.source.hasAttribute('disabled') : this.source[0]?.hasAttribute('disabled');
     }
 
     /**
@@ -117,7 +116,7 @@ export abstract class AbstractControl {
      *
      */
     get enabled(): boolean {
-        return this.status ? this.status !== FormControlStatus.DISABLED : !this.toJQuery()[0]?.hasAttribute('disabled');
+        return this.status ? this.status !== FormControlStatus.DISABLED : this.source instanceof HTMLElement ? !this.source.hasAttribute('disabled') : !this.source[0]?.hasAttribute('disabled');
     }
 
     /**
@@ -285,7 +284,7 @@ export abstract class AbstractControl {
      * @see {@link AbstractControl.status}
      */
     disable(): void {
-        this.toJQuery()[0].setAttribute('disabled', '');
+        this.source instanceof HTMLElement ? this.source.setAttribute('disabled', '') : this.source.forEach(e => e.setAttribute('disabled', ''));
         this.disabledSubject.next(true);
     }
 
@@ -299,7 +298,7 @@ export abstract class AbstractControl {
      * @see {@link AbstractControl.status}
      */
     enable(): void {
-        this.toJQuery()[0].removeAttribute('disabled');
+        this.source instanceof HTMLElement ? this.source.removeAttribute('disabled') : this.source.forEach(e => e.removeAttribute('disabled'));
         this.disabledSubject.next(false);
     }
 
@@ -379,8 +378,8 @@ export abstract class AbstractControl {
             console.log(this.errors);
     }
 
-    toJQuery(): JQuery {
-        return this.jQueryObject;
+    get source(): HTMLElement | FormControlType[] {
+        return this._source;
     }
 
     subscriptions: Subscription;
