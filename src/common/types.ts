@@ -87,4 +87,63 @@ declare global {
          */
         asFormGroup<TControls = any>(valueChangesUI?: Observable<any>, touchedUI$?: Observable<void>, dirtyUI$?: Observable<void>): FormGroup<TControls>;
     }
+
+    interface HTMLElement {
+
+        /**
+         * Converts a jQuery object to a form control,
+         * or returns the cached version if the same element is already being used as a control.
+         * Form control has properties for:
+         *  - observing values, {@link JQuery.valueChanges}
+         *  - checking whether user's changed the value, {@link JQuery.dirty}
+         *  - checking whether user's interacted any way with the control, {@link JQuery.touched}
+         * @param valueChangesUI Observable to use for observing values, instead of the default `valueChanges`. Note: `val(value)` will also make it emit values.
+         * @param touchedUI$ Sets `touched = true` every time it emits.
+         * @param dirtyUI$ Sets `dirty = true` every time it emits.
+         */
+        asFormControl<TValue = string>(valueChangesUI?: Observable<TValue>, touchedUI$?: Observable<void>, dirtyUI$?: Observable<void>): FormControl<TValue>;
+
+        /**
+         * Converts a jQuery object to a form group,
+         * or returns the cached version if the same selection of elements is already being used as a group.
+         * Form groups' descendants which are form controls, are added to the {@link JQuery.controls} array,
+         * and group and its controls have been attached with the properties for:
+         *  - observing values, {@link JQuery.valueChanges}
+         *  - checking whether user's changed the value, {@link JQuery.dirty}
+         *  - checking whether user's interacted any way with the control, {@link JQuery.touched}
+         * @param valueChangesUI Observable to use for observing values, instead of the default `valueChanges`. Note: `val(value)` will also make it emit values.
+         * @param touchedUI$ Sets `touched = true` every time it emits.
+         * @param dirtyUI$ Sets `dirty = true` every time it emits.
+         */
+        asFormGroup<TControls = any>(valueChangesUI?: Observable<any>, touchedUI$?: Observable<void>, dirtyUI$?: Observable<void>): FormGroup<TControls>;
+    }
+
+    interface NodeListOf<TNode extends Node> extends NodeList {
+        /**
+         * Converts a jQuery object to a form control,
+         * or returns the cached version if the same element is already being used as a control.
+         * Form control has properties for:
+         *  - observing values, {@link JQuery.valueChanges}
+         *  - checking whether user's changed the value, {@link JQuery.dirty}
+         *  - checking whether user's interacted any way with the control, {@link JQuery.touched}
+         * @param valueChangesUI Observable to use for observing values, instead of the default `valueChanges`. Note: `val(value)` will also make it emit values.
+         * @param touchedUI$ Sets `touched = true` every time it emits.
+         * @param dirtyUI$ Sets `dirty = true` every time it emits.
+         */
+        asFormControl<TValue = string>(valueChangesUI?: Observable<TValue>, touchedUI$?: Observable<void>, dirtyUI$?: Observable<void>): FormControl<TValue>;
+
+        /**
+         * Converts a jQuery object to a form group,
+         * or returns the cached version if the same selection of elements is already being used as a group.
+         * Form groups' descendants which are form controls, are added to the {@link JQuery.controls} array,
+         * and group and its controls have been attached with the properties for:
+         *  - observing values, {@link JQuery.valueChanges}
+         *  - checking whether user's changed the value, {@link JQuery.dirty}
+         *  - checking whether user's interacted any way with the control, {@link JQuery.touched}
+         * @param valueChangesUI Observable to use for observing values, instead of the default `valueChanges`. Note: `val(value)` will also make it emit values.
+         * @param touchedUI$ Sets `touched = true` every time it emits.
+         * @param dirtyUI$ Sets `dirty = true` every time it emits.
+         */
+        asFormGroup<TControls = any>(valueChangesUI?: Observable<any>, touchedUI$?: Observable<void>, dirtyUI$?: Observable<void>): FormGroup<TControls>;
+    }
 }

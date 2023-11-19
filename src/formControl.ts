@@ -1,9 +1,8 @@
 import {AbstractControl} from "./abstractControl";
 import {checkIfCheckboxControl, checkIfRadioControl, getCheckboxValue, getRadioValue} from "./common/misc";
-import {asapScheduler, fromEvent, merge, Observable, Subject} from "rxjs";
+import {fromEvent, merge, Observable, Subject} from "rxjs";
 import {addToCache, findCachedElement} from "./common/cache";
-import {distinctUntilChanged, map, observeOn, share, startWith, tap} from "rxjs/operators";
-import {FormGroup} from "./formGroup";
+import {distinctUntilChanged, map, share, startWith, tap} from "rxjs/operators";
 import {attachPopper, setValidationRulesFromAttributes} from "./validation/validation";
 import {FormControlStatus, FormControlType, ValidationErrors} from "./common/types";
 
@@ -44,33 +43,37 @@ export class FormControl<TValue = any> extends AbstractControl {
     value: TValue;
     public readonly valueChanges!: Observable<TValue>;
     protected valueChangesSubject: Subject<TValue>;
+    private ignoreValueSetter = false;
+    private ignoreValueGetter = false;
 
     constructor(
-        jQueryObject: JQuery,
+        object: HTMLElement | FormControlType[],
         valueChangesUI?: Observable<TValue>,
         touchedUI$?: Observable<void>,
         dirtyUI$?: Observable<void>
     ) {
-        super(jQueryObject);
+        super(object);
 
         // See if it's cached
-        let cachedElement = findCachedElement(jQueryObject);
+        let cachedElement = findCachedElement(object);
         if (cachedElement)
             return cachedElement as FormControl<TValue>;
 
+        let elements = [...[object]].flat();
+
         // No empty controls without valueChangesUI provided
-        if (jQueryObject.length === 0 && valueChangesUI == null)
+        if ((object == null || elements.length === 0) && valueChangesUI == null)
             throw 'Empty controls must have valueChanges provided.'
 
-        jQueryObject.each((_, element) => element.setAttribute('formControl', '')); // radio / checkbox controls have multiple elements.
+        elements.forEach(element => element.setAttribute('formControl', '')); // radio / checkbox controls have multiple elements.
 
         // If control belongs to shadow root, mark the host with an attribute
-        if (jQueryObject.length && jQueryObject[0].getRootNode() instanceof ShadowRoot)
-            (jQueryObject[0].getRootNode() as ShadowRoot).host.setAttribute('formControl-shadow-root', '');
+        if (elements.length && elements[0].getRootNode() instanceof ShadowRoot)
+            (elements[0].getRootNode() as ShadowRoot).host.setAttribute('formControl-shadow-root', '');
 
         this.setupObservables(valueChangesUI, touchedUI$, dirtyUI$);
 
-        if (jQueryObject.length !== 0)
+        if (elements.length !== 0)
             addToCache(this);
     }
 
@@ -80,22 +83,30 @@ export class FormControl<TValue = any> extends AbstractControl {
      * @param value The new value for the control.
      */
     setValue(value: TValue): void {
-        let $control = this.toJQuery();
+        let elements = [...[this.source]].flat();
 
-        let isCheckbox = checkIfCheckboxControl($control);
-        let isRadio = checkIfRadioControl($control);
+        let isCheckbox = checkIfCheckboxControl(this.source);
+        let isRadio = checkIfRadioControl(this.source);
 
         if (isCheckbox) {
-            let shouldBeChecked = $control.filter('[type=checkbox]').val() === value.toString();
-            $control.filter('[type=checkbox]').prop('checked', shouldBeChecked);
+            let selector = '[type=checkbox]';
+            let elementToCheck = elements.map(e => e.matches(selector) ? e : e.querySelector(selector)).filter(e => !!e)[0] as HTMLInputElement;
+            if (elementToCheck)
+                elementToCheck.checked = elementToCheck.value === value.toString();
         } else if (isRadio) {
-            value as any !== '' && value != null
-                ? $control.filter('[value="' + value + '"]').prop('checked', true)
-                : $control.prop('checked', false);
-        } else
-            ($control[0] as FormControlType).value = value as any;
+            if (value as any !== '' && value != null) {
+                let selector = '[value="' + value + '"]';
+                let elementToCheck = elements.map(e => e.matches(selector) ? e : e.querySelector(selector)).filter(e => !!e)[0] as HTMLInputElement;
+                if (elementToCheck)
+                    elementToCheck.checked = true;
+            } else {
+                elements.forEach(e =>
+                    e.querySelectorAll('[type=radio]').forEach(ee => (ee as HTMLInputElement).checked = false));
+            }
+        } else if (!this.ignoreValueSetter)
+            (elements[0] as FormControlType).value = value as any;
 
-        this.valueChangesSubject.next(getFormControlValue(this.toJQuery() as JQuery<FormControlType>) as any);
+        this.valueChangesSubject.next(getFormControlValue(this) as any);
     }
 
     /**
@@ -130,7 +141,7 @@ export class FormControl<TValue = any> extends AbstractControl {
 
         valueChangesUI = valueChangesUI != null
             ? valueChangesUI
-            : fromEvent(this.toJQuery(), 'input').pipe(startWith(''), map(_ => getFormControlValue(this.toJQuery() as JQuery<FormControlType>)))
+            : fromEvent(this.source, 'input').pipe(startWith(''), map(_ => getFormControlValue(this)))
             // Note: startWith() is used to calculate the initial value.
 
         let s1 = valueChangesUI.subscribe(value => this.valueChangesSubject.next(value));
@@ -138,7 +149,7 @@ export class FormControl<TValue = any> extends AbstractControl {
         // Touched state
         touchedUI$ = touchedUI$
             ? touchedUI$
-            : fromEvent(this.toJQuery(), 'focus') as any;
+            : fromEvent(this.source, 'focus') as any;
 
         let s2 = touchedUI$.subscribe(_ => this.markAsTouched());
 
@@ -168,7 +179,7 @@ export class FormControl<TValue = any> extends AbstractControl {
         ).pipe(
             startWith(''),
             tap(_ => (this as {errors: ValidationErrors}).errors = this.getValidators()?.map(validatorFn => validatorFn(this)).reduce((acc, curr) => curr ? {...acc, ...curr} : acc, null)),
-            map(_ => this.toJQuery().attr('disabled') ? FormControlStatus.DISABLED : this.errors ? FormControlStatus.INVALID : FormControlStatus.VALID),
+            map(_ => [...[this.source]].flat()[0]?.hasAttribute('disabled') ? FormControlStatus.DISABLED : this.errors ? FormControlStatus.INVALID : FormControlStatus.VALID),
 
             share()
         );
@@ -194,22 +205,25 @@ export class FormControl<TValue = any> extends AbstractControl {
         (this as {isValidationEnabled: boolean}).isValidationEnabled = true;
 
         // Attach popper
-        if (withUIElements && this.toJQuery().length)
+        if (withUIElements && [...[this.source]].flat().length)
             attachPopper(this);
 
         return this;
     }
-
-
 }
 
-export function getFormControlValue($formControl: JQuery<FormControlType>): string {
-    let isCheckbox = checkIfCheckboxControl($formControl);
-    let isRadio = checkIfRadioControl($formControl);
+export function getFormControlValue(control: FormControl): string {
+    let source = control.source;
+    let elements = [...[source]].flat();
+    let isCheckbox = checkIfCheckboxControl(source);
+    let isRadio = checkIfRadioControl(source);
 
-    return !isCheckbox && !isRadio
-        ? $formControl[0].value
+    (control as any).ignoreValueGetter = true;
+    let result = !isCheckbox && !isRadio
+        ? (elements[0] as FormControlType).value
         : isCheckbox
-            ? getCheckboxValue($formControl as JQuery<HTMLInputElement>)
-            : getRadioValue($formControl as JQuery<HTMLInputElement>);
+            ? getCheckboxValue(elements)
+            : getRadioValue(elements);
+    (control as any).ignoreValueGetter = false;
+    return result;
 }

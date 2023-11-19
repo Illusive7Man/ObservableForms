@@ -1,23 +1,20 @@
-import {constructControls, convertJsonToArray, findFormControls, isFormControl} from "./common/misc";
 import {Observable} from "rxjs";
-import {cachedControlsAndGroups, findCachedElement, removeFromCache} from "./common/cache";
-import {ConfigService} from "./common/config";
+import {findCachedElement} from "./common/cache";
 import {AbstractControl} from "./abstractControl";
 import {FormControl} from "./formControl";
-import {flattenControls, FormGroup} from "./formGroup";
-import {ControlTreePath, FormControlType} from "./common/types";
+import {FormGroup} from "./formGroup";
 
-export function extendFormElements(): void {
+export function extendJQueryElements(): void {
     let baseAttrFn = jQuery.fn.attr;
     let baseRemoveAttr = jQuery.fn.removeAttr;
     let baseValFn = jQuery.fn.val;
 
     jQuery.fn.extend({
         asFormControl<TValue = string>(valueChangesUI?: Observable<any>, touchedUI$?: Observable<void>, dirtyUI$?: Observable<void>): FormControl<TValue> {
-            return new FormControl<TValue>(this, valueChangesUI, touchedUI$, dirtyUI$);
+            return new FormControl<TValue>(this.length === 1 ? [...this][0] : [...this], valueChangesUI, touchedUI$, dirtyUI$);
         },
         asFormGroup<TControl = any>(valueChangesUI?: Observable<TControl>, touchedUI$?: Observable<void>, dirtyUI$?: Observable<void>): FormGroup<TControl> {
-            return new FormGroup<TControl>(this, valueChangesUI, touchedUI$, dirtyUI$);
+            return new FormGroup<TControl>(this.length === 1 ? [...this][0] : [...this], valueChangesUI, touchedUI$, dirtyUI$);
         },
         val(value: any): any {
 
@@ -25,7 +22,7 @@ export function extendFormElements(): void {
             if (value instanceof Function)
                 return baseValFn.apply(this, arguments);
 
-            let cachedControl = findCachedElement(this);
+            let cachedControl = findCachedElement(this as HTMLElement);
 
             if (cachedControl == null)
                 return baseValFn.apply(this, arguments);
@@ -53,9 +50,9 @@ export function extendFormElements(): void {
             let controlsToUpdate: AbstractControl[] = [];
 
             this.each(function() {
-                let control = findCachedElement(this);
+                let control = findCachedElement(this as HTMLElement);
                 if (control) {
-                    let currentType = control && (control.toJQuery()[0] as HTMLInputElement).type;
+                    let currentType = control && ([...[control.source]].flat()[0] as HTMLInputElement).type;
                     if (attributeName === 'disabled' || attributeName === 'type' && [currentType, value].some(e => e === 'hidden') && [currentType, value].some(e => e !== 'hidden'))
                         controlsToUpdate.push(control);
                 }
@@ -74,7 +71,7 @@ export function extendFormElements(): void {
                 return result;
 
             this.each(function () {
-                let control = findCachedElement(this);
+                let control = findCachedElement(this as HTMLElement);
                 if (!control)
                     return;
 

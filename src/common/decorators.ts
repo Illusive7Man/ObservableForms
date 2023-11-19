@@ -7,7 +7,7 @@ export function validationEnabled(
     name: string,
     descriptor: PropertyDescriptor
 ) {
-    let controlName = target.toJQuery()?.attr('name');
+    let controlName = [...[target.source]].flat()[0]?.getAttribute('name');
 
     if (target.isValidationEnabled !== true && descriptor == null) {
         controlName && console.warn(controlName + ': ' + VALIDATION_DISABLED);

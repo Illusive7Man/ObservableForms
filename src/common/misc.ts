@@ -151,12 +151,12 @@ export function convertJsonToArray(value: any, ofFormControls = false, name?: st
 
 /**
  * Returns true if the provided object has selected only the radio elements with the same name.
- * @param jQueryObject
+ * @param object
  */
-export function checkIfRadioControl(jQueryObject: JQuery | FormControlType[]): boolean {
-    let controls = Array.isArray(jQueryObject)
-        ? jQueryObject
-        : (jQueryObject[0] instanceof HTMLFormElement ? (jQueryObject).find('input') : jQueryObject).toArray().filter(htmlElement => isFormControl(htmlElement)) as FormControlType[];
+export function checkIfRadioControl(object: HTMLElement | FormControlType[]): boolean {
+    let controls = Array.isArray(object)
+        ? object
+        : (object instanceof HTMLFormElement ? [...object.querySelectorAll('input')] : [object]).filter(htmlElement => isFormControl(htmlElement)) as FormControlType[];
 
     return controls.length === 0
         ? false
@@ -165,12 +165,12 @@ export function checkIfRadioControl(jQueryObject: JQuery | FormControlType[]): b
 
 /**
  * Returns true if one of the element is type 'checkbox' and other is type 'hidden'. And with the same name.
- * @param jQueryObject
+ * @param object
  */
-export function checkIfCheckboxControl(jQueryObject: JQuery | FormControlType[]): boolean {
-    let controls = Array.isArray(jQueryObject)
-        ? jQueryObject
-        : (jQueryObject[0] instanceof HTMLFormElement ? (jQueryObject).find('input') : jQueryObject).toArray().filter(htmlElement => isFormControl(htmlElement)) as FormControlType[];
+export function checkIfCheckboxControl(object: HTMLElement | FormControlType[]): boolean {
+    let controls = Array.isArray(object)
+        ? object
+        : (object instanceof HTMLFormElement ? [...object.querySelectorAll('input')] : [object]).filter(htmlElement => isFormControl(htmlElement)) as FormControlType[];
 
     return controls.length === 1 && controls[0].getAttribute('type') === 'checkbox'
         || controls.length === 2 && controls[0].getAttribute('name') === controls[1].getAttribute('name')
@@ -206,10 +206,10 @@ export function combineRadiosAndCheckboxes(formControls: FormControlType[]): HTM
 /**
  * If checked, returns input's value, otherwise returns hidden namesake's value.
  */
-export function getCheckboxValue(jQueryObject: JQuery<HTMLInputElement>): string {
-    let controls = jQueryObject.toArray();
-    let checkboxInput = controls.find(c => c.getAttribute('type') === 'checkbox');
-    let hiddenInput = controls.find(c => c.getAttribute('type') === 'hidden');
+export function getCheckboxValue(elements: HTMLElement[]): string {
+    let selector = '[type=checkbox]';
+    let checkboxInput = elements.map(e => e.matches(selector) ? e : e.querySelector(selector)).filter(e => !!e)[0] as HTMLInputElement;
+    let hiddenInput = elements.map(e => e.matches('[type=hidden]') ? e : e.querySelector('[type=hidden]')).filter(e => !!e)[0] as HTMLInputElement;
 
     return checkboxInput.checked ? checkboxInput.value : hiddenInput?.value ?? '';
 }
@@ -217,10 +217,10 @@ export function getCheckboxValue(jQueryObject: JQuery<HTMLInputElement>): string
 /**
  * If any radio is checked returns its value, otherwise null;
  */
-export function getRadioValue(jQueryObject: JQuery<HTMLInputElement>): string {
-    let controls = jQueryObject.toArray();
-
-    let checkedRadio = controls.find(c => c.checked);
+export function getRadioValue(elements: HTMLElement[]): string {
+    let selector = '[type=radio]';
+    let checkedRadio = elements.map(e => e.matches(selector) ? [e] : [...e.querySelectorAll(selector)]).flat()
+        .find(e => (e as HTMLInputElement).checked) as HTMLInputElement;
     return checkedRadio?.value ?? '';
 }
 
