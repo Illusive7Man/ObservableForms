@@ -12,18 +12,14 @@ Removed jQuery dependency. Added support for native HTMLElement and NodeList.
 
 ## Introduction
 
-Extension for creating JavaScript object representation of html forms. Intended for use in non-JavaScript SSR web frameworks  (Spring MVC, PHP, .NET MVC, Django...).<br/>
-Instead of manually selecting and attaching JavaScript code to form's elements,
- access to form model is provided through objects called `FormControl` and `FormGroup` that are created from `HTMLElement` or `NodeList`.
-Using static type checking and reactive properties, this library enables you to create and manage forms reactively in any project, without the need for a build process.
+A client-side library for creating an observable object from HTML form elements. As an observable object, it will have built-in reactivity
+so the library is framework-independent and compatible with any ecosystem. It can be used with MVC, SPA, SSR, etc., frameworks.
+Reactivity is RxJS based and its API is inspired by what Angular has used for forms since Angular 2.
 
 <figure>
 <img src="https://i.imgur.com/ahYEZba.jpeg" alt="code example">
   <figcaption>Demo usage</figcaption>
 </figure>
-
-### Prerequisites:
-- Knowledge of RxJS.<br/>
 
 <a name="functionality"/>
 
@@ -40,14 +36,11 @@ Example of creating and using a form control:
 // Module imports
 import ...
 
-// FormControl created
+// Example 1: logging FormControl values
 let firstName = document.getElementById('firstName').asFormControl().enableValidation();
 firstName.valueChanges.subscribe(value => console.log('My new value is: ' + value));
 
-// ... let's try something a bit more complicated
-// Either copy the delivery address into payment address field,
-// or track payment address status, and alert the user if invalid (validation logic not shown)
-
+// Example 2: Complex directing between different controls
 // Using delivery and payment controls
 let deliveryAddress = document.getElementById('delivery-address').asFormControl();
 let paymentAddress = document.getElementById('payment-address').asFormControl().enableValidation();
@@ -69,10 +62,7 @@ Form group aggregates controls found in the subtree of the selected element(s) i
 with each control's name as the key. Name is either control's `name` attribute or one manually provided.<br/>
 Class of this object accepts a **type parameter** representing the model of the form group,
 which provides static type checking when working with the controls and values.<br/>
-<ins>Type checking is also available in plain JavaScript no-build projects, as demonstrated in the Demos.</ins><br/><br/>
-_Author's note: The easiest way to have type checking is to find a tool
-that will generate TypeScript versions of your backend classes, and use those as type parameters of form groups.
-Here's the one I use for .NET MVC, [link](https://www.nuget.org/packages/TypeScriptBuilder)._
+<ins>Type checking is also available in plain JavaScript no-build projects using JSDoc (demo available).</ins><br/><br/>
 
 
 Some features of the FormGroup objects are:
@@ -80,6 +70,7 @@ Some features of the FormGroup objects are:
 - Controls can be added and removed from the group.
 - Validation
 - Custom controls as child controls
+- Simple abstraction for radio and checkbox controls
 - Web Components support
 
 
@@ -127,10 +118,6 @@ These demos will try to cover as many scenarios as possible, such as:
 - handling [Web Components](https://developer.mozilla.org/en-US/docs/Web/Web_Components)
 - changing form's data / resetting
 - handling arrays
-
-_Note: These demos are hosted on codesandbox, and code behind the forms can be accessed using the "Open Sandbox" button.
-Fullscreen view is preferable, considering the style of validation messages.
-Styling can be changed, as shown in the comments of Demo 1._<br/>
 
 ### Demo 1 - "A standard form"
 A JavaScript project covering a lot of library's functionalities, and showing how to integrate type checking into JavaScript code.<br/>
