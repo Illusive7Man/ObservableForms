@@ -2,7 +2,7 @@
 
 
 # &nbsp;&nbsp;Observable Forms [![npm version](https://badge.fury.io/js/observable-forms.svg)](http://badge.fury.io/js/observable-forms)
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Inspired by Angular forms.
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Framework-agnostic port of Angular's Reactive forms.
 </div>
 <br/><br/><br/><br/>
 
@@ -13,7 +13,7 @@ Removed jQuery dependency. Added support for native HTMLElement and NodeList.
 ## Introduction
 
 A client-side library for creating an observable object from HTML form elements. As an observable object, it will have built-in reactivity
-so the library is framework-independent and compatible with any ecosystem. It can be used with MVC, SPA, SSR, etc., frameworks.
+so the library is framework-agnostic and compatible with any ecosystem. It can be used with MVC, SPA, SSR, etc., frameworks.
 Reactivity is RxJS based and its API is inspired by what Angular has used for forms since Angular 2.
 
 <figure>
